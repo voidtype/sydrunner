@@ -279,6 +279,7 @@ class Terrain:
         conform_pads: bool = True,
         bare_earth: bool = True,
         shoreline: bool = True,
+        one_sided: bool = True,
     ) -> Terrain:
         """The extent's ground, with the streets levelled into it.
 
@@ -361,6 +362,19 @@ class Terrain:
         has finished with. Its write can therefore be carried outside its own
         band by the road solve exactly as the bare-earth pass's can, and
         `shoreline-check.py` measures that shadow rather than asserting it away.
+
+        `one_sided` is **not a sixth pass.** It is the one operator choice inside
+        the road solve that can be turned off, and it is a named argument for the
+        reason section 3c of RAIL-VERTICAL.md gives about the other five: a check
+        needs a before column, and a knob that is not an argument gets turned
+        with a monkeypatch behind a cache that cannot see it. On, the Lipschitz
+        projection in `roadgrade.py` is one-sided wherever the passes above have
+        measured that the DSM's error here is upward -- see that module's
+        `--- The sign of the error ---` block. Off, it is the symmetric average,
+        which is what shipped until 2026-09-10 and what the ground under every
+        street in this city was solved with until then. Only
+        `roadgrade-sign-check.py` and `road-grade-audit --surface raw` pass
+        `False`.
         """
         dem, origin_px, mpp = cls._load_dem(radius_m, zoom)
 
@@ -402,6 +416,25 @@ class Terrain:
         # `terraincache`, which is what stops this solve running most rounds.
         del dem
         field = cls(_Lattice(heights, -reach, -reach, spacing), base, stats)
+
+        # What the passes below are about to learn about the sign of the DSM's
+        # error here, for the road solve to project with. One float32 array on
+        # this lattice's own grid, alive only until `solve` has read it -- it is
+        # an input to one solve and not a property of the ground, and this object
+        # is what `terraincache` pickles. `roadgrade.GroundEvidence` argues the
+        # whole of it; what belongs here is the `before` snapshot, and it is
+        # taken across *both* early passes rather than inside either, so that a
+        # sixth pass that lowers the ground before the solve is believed for
+        # free and nobody has to remember to wire it in.
+        evidence = None
+        before = None
+        if one_sided and (bare_earth or shoreline):
+            from . import roadgrade as roadgrade_module
+
+            evidence = roadgrade_module.GroundEvidence(
+                heights.shape, -reach, -reach, spacing
+            )
+            before = heights.copy()
         if bare_earth:
             # First, and reading nothing this build has computed: the correction
             # is a function of the raw terrarium pixels and the OSM footprints
@@ -440,10 +473,17 @@ class Terrain:
 
             stats["shoreline"] = shore_module.conform(
                 heights, -reach, -reach, spacing, radius_m, base, zoom,
-                field.sample, field.shore,
+                field.sample, field.shore, evidence,
             )
             stats["min"] = float(heights.min())
             stats["max"] = float(heights.max())
+        if evidence is not None:
+            # Every metre the two passes above took off, in one diff. Taken here
+            # rather than reported by each pass because it is a property of the
+            # lattice and not of either rule, and because a diff cannot forget a
+            # pass the way a report can.
+            evidence.corrected(before - heights)
+            del before
         if conform_roads:
             # The solve reads the *unconformed* surface through `field.sample`
             # and the conformance then writes back into the same array, so the
@@ -452,12 +492,16 @@ class Terrain:
             # stops the surface being a function of itself.
             from . import roadgrade
 
-            surface = roadgrade.solve(field.sample, radius_m)
+            surface = roadgrade.solve(field.sample, radius_m, evidence=evidence)
             stats["roads"] = surface.stats
             stats["conform"] = roadgrade.conform(heights, -reach, -reach, spacing, surface)
             stats["min"] = float(heights.min())
             stats["max"] = float(heights.max())
             field.road_surface = surface
+        # The evidence has been read and is a lattice-sized float32 array; the
+        # water pass below allocates its own and this is the one place in the
+        # head worth handing memory back, exactly as the DEM's `del` above is.
+        evidence = None
         if conform_water:
             # Read against the surface as the roads left it, and written back
             # into the same array afterwards -- the same order, for the same
@@ -757,10 +801,19 @@ def _bilinear(grid: np.ndarray, x, y):
 # DSM reads as a wharf shed comes down and a foreshore that is real rock does
 # not. It removes 5.63 m of the Quay's 29.56 m error and RAIL-VERTICAL.md
 # section 3d has every term of the rest -- including the one that is not the
-# DEM's at all: `roadgrade._lipschitz` averages a downward projection with an
-# upward one and so hands back 59% of anything taken off a shore that is tied to
+# DEM's at all: `roadgrade._lipschitz` averaged a downward projection with an
+# upward one and so handed back 59% of anything taken off a shore that is tied to
 # a CBD still reading 40 to 55 m. The city-wide pass this note has always asked
 # for is still the follow-up, and section 3d's reach sweep is what it is worth.
+#
+# UPDATE 2026-09-10, later still: that last term is fixed, in `roadgrade.py`'s
+# `--- The sign of the error ---` block and RAIL-VERTICAL.md section 3e. The
+# projection is now one-sided wherever an earlier pass has *measured* that the
+# error here is upward, so a corrected shore pulls the streets behind it down
+# along the grade limit instead of being pulled up to meet them. It does not
+# make this note obsolete: it decides how much of a correction survives, and it
+# has no correction of its own to make in the middle of the CBD, where nothing
+# has yet told the ground anything.
 #
 # UPDATE: the *worst* consequence of it has since been dealt with separately, and
 # it is worth being clear about which. The contamination made the roads unusable

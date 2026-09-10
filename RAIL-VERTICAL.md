@@ -608,7 +608,8 @@ finish it are already named in other files' headers:
 - **a Lipschitz projection that knows its error has a sign** — one-sided where
   the observation is a surface model over a city, symmetric elsewhere. That is a
   change to every street in Sydney, it belongs to whoever owns `roadgrade.py`,
-  and `road-grade-audit` is its gate.
+  and `road-grade-audit` is its gate. *(Built the same day — §3e. The Quay
+  promenade goes 26.42 → 15.18 m AHD and kept/written 0.41 → 1.13.)*
 
 **Two of §3b's numbers move, and neither is a regression.** `bare-earth-check.py`
 now runs both of its columns on ground this pass has already touched, so Circular
@@ -625,6 +626,195 @@ waiting.** `cli.cmd_road_grade_audit`'s `--surface raw` called
 named three of what are now five flags, so its "before" column was the raw drape
 *with the bare-earth pass still in it* — the identical trap §3c found in
 `rail.build_all`. Every flag is now named there.
+
+#### 3e. Amendment, 2026-09-10: the projection learns that the error has a sign
+
+§3d ended by naming two things that would finish the Quay and handing one of
+them on: *"a Lipschitz projection that knows its error has a sign — one-sided
+where the observation is a surface model over a city, symmetric elsewhere. That
+is a change to every street in Sydney, it belongs to whoever owns
+`roadgrade.py`, and `road-grade-audit` is its gate."* This is that, in
+`pipeline/sydney/roadgrade.py`'s `--- The sign of the error ---` block, gated by
+`pipeline/sydney/roadgrade-sign-check.py`.
+
+**The defect, in one paragraph, because §3d already measured it.** `_lipschitz`
+returned the average of a downward projection and an upward one, and its own
+docstring said why: *"cutting a spike down and filling the valleys either side of
+it up are both legal answers and the truth is between them."* True of an error of
+unknown sign. This error has a sign — `roadgrade.OPENING_M`'s note says
+*contamination is always upward*, `bareearth.BUILT_COEFF`'s says it, and
+`shoreline.py`'s own `np.minimum(natural, ...)` says it. So when the shore came
+down eleven metres and the CBD three hundred metres away stayed at fifty, the
+average split an error that was **entirely the CBD's** evenly between them:
+kept/written **0.41**.
+
+**The fix is not a global switch to the downward projection**, and that is the
+whole design. `low` alone is `roadgrade.TIE_RADIUS_M`'s table read at a cap of
+zero — it shaves every real crest, because a Sydney ridge tied to a street in the
+valley is a violation too and cutting the ridge is one of the two legal answers.
+The average is *right* on a sandstone headland. So the operator is one-sided
+**per post**:
+
+>     lambda = 0.5 + 0.5 * confidence            confidence in [0, 1]
+>     h      = relax_down( lambda * low + (1 - lambda) * high )
+
+**The final downward relax is what does the work and it is the trick.** A mixture
+taken node by node is not feasible — a node that took `low` beside one that took
+`high` can be further apart than the budget allows — so it is projected once
+more, downward, onto the constraint set. That projection can only lower, so a
+post whose height is already known **pulls its neighbours down along the grade
+limit instead of being pulled up to meet them**, which is the sentence the whole
+change exists to make true. It also means the confidence only has to be right at
+the post that knows something: the contaminated neighbour needs no opinion of its
+own, feasibility brings it down.
+
+Two properties fall out, and the check asserts both:
+
+- `low <= new <= old`, node by node. The answer is sandwiched between the global
+  switch the evidence declined to take and the average it replaces, so **nothing
+  in Sydney is ever raised by this change** and the worst case is an operator
+  whose behaviour `TIE_RADIUS_M`'s table already measured.
+- with no confidence anywhere the result is the old average **bit for bit**, by
+  an early return rather than by an argument about floating point. That is what
+  `Terrain.load(one_sided=False)` is, and it is a named flag in `terraincache`'s
+  key for §3c's reason: a knob that is not an argument gets turned with a
+  monkeypatch behind a cache that cannot see it.
+
+**What counts as evidence.** Not a label and not an extent — the measurements the
+passes above already made, per post, continuous, which is rule 1 of this document
+read for the ground:
+
+| signal | what it is | where it comes from |
+|---|---|---|
+| **metres already taken off** | a post the shore rule pulled down 11 m is a post whose height came from a *rule*, not from a surface model | `Terrain.load` snapshots the lattice before `bareearth` and diffs it after `shoreline`, so it is every early pass's write at once and a sixth pass joins it for free |
+| **the deconvolution's `built_drop`** | *how much building the DSM is looking at here*, metres | `shoreline.conform` reports the raster it already computed for its own floor; nobody computes it twice |
+| **water adjacency** | **not a term.** North Head, the Gap and Dover Heights are eighty-metre cliffs at a mapped tidal waterline — `shoreline.py`'s built-mass floor exists because of them. The shore weight enters as a *shape* on the built term, which is also what keeps this operator from putting a step at 250 m that `shoreline.py` went to trouble not to | — |
+
+`SIGN_CORRECTED_M` is 1.5 m and `SIGN_BUILT_M` is 12.0 m, and **the sweep's first
+finding is that neither is a tuning knob**: the Quay column does not move across a
+factor of eight and neither does Town Hall. What decides the answer is that a post
+has *some* confidence, not how fast it saturates. The table is in the module.
+
+**The gate, on the 5.3 km ring.** Eight lattices — the shore pass off and on,
+crossed with symmetric and one-sided, plus a pair with the water and the pads off,
+which is the pair the no-rise assertion is made on. It is made there and not on
+the shipped pair deliberately: `water.conform`'s hold is an `np.maximum` and a
+pond's own surface is `BODY_QUANTILE` of the terrain inside it, so neither of
+those two passes is monotone and asserting on the shipped lattice would be
+asserting that they are.
+
+| | |
+|---|---|
+| the road pass alone | **18,889 of 148,225 posts came down, 0 went up**, largest rise 0.000000 m |
+| the shipped lattice | 17,847 down, **16 up, max 0.237 m** — every one a pond level or a stated pad reacting to lower ground, all with the road pass's own move at exactly 0.000000 |
+| the solved profile | 137,780 nodes both ways; grade p95 7.97% → 8.63%, max **15.000% → 15.000%**, `MAX_GRADE` over-count **0 → 0** |
+| evidence reached | 29,241 nodes, 14,877 at confidence 0.5 or better; 17,004 nodes lowered, p95 0.601, max 6.069 m |
+| the whole lattice diff | p50 0.129 / p95 8.608 / max 19.977 m |
+| **past 1 km from mapped tidal water** | **61 posts moved at all, the deepest by 0.054 m** |
+| 200 random graphs | every edge inside its budget, `low <= new <= sym` everywhere, zero confidence bit-identical |
+
+**The Quay transect** (m AHD, the shipped chain both sides; §3d's "on" column is
+this table's "symmetric"):
+
+| N | d(water) | symmetric | one-sided | in life |
+|---|---|---|---|---|
+| 900 | wet | −1.46 | −1.46 | the bed `water.conform` cut |
+| 860 | 5 m | 12.16 | **7.09** | ~2.5, the promenade |
+| 820 | 32 m | 26.42 | **15.18** | ~2.5, behind the seawall |
+| 780 | 72 m | 28.27 | **16.65** | ~4, Alfred Street |
+| 700 | 152 m | 35.61 | **23.96** | ~6 |
+| 680 | 172 m | 37.44 | **25.74** | ~6, under the Cahill deck |
+
+Every station is closer and none is close; the residue is the DSM's own ten
+metres and the CBD pass that has not been written. **Median kept / written, on
+the same population `shoreline-check.py` section 3 measures: 0.41 → 1.13.** Past
+1.00 that ratio has stopped meaning "how much survives" and started meaning "what
+a corrected shore is worth", because the correction now propagates inland along
+the grade limit instead of stopping at the band — which is the intended
+behaviour, stated here so nobody reads 1.13 as a bug.
+
+**The escarpment, which is what a per-post operator buys over a global switch.**
+`TIE_RADIUS_M`'s table watches Kings Cross over Woolloomooloo and records that at
+a 6% cap *"the escarpment is gone — the top has come down 8 m and the valley has
+come UP 5"*. Here the two heights do move — a tie chain is transitive and the
+Woolloomooloo foreshore two hundred metres north was corrected — but the landform
+does not:
+
+| | symmetric | one-sided |
+|---|---|---|
+| Kings Cross, the top of the ridge | 46.91 | 45.16 |
+| Woolloomooloo, the valley floor | 6.77 | 5.10 |
+| **the relief between them** | **40.14 m** | **40.07 m** (−0.07) |
+
+And five inland controls — Surry Hills at 948 m from water, Centennial Park at
+971 (`bareearth.py`'s own negative control), Randwick, Alexandria, Sydney Park at
+3.2 km — come out at **+0.0000 every one**. Town Hall, which is 666 m from water
+and the one place in the extent where the truth is written down, moves **−1.14 m**
+against the ~11 m error `terrain.py` records there: this is not the city-wide
+deconvolution arriving under another name, which is the thing
+`shoreline.SHORE_REACH_M`'s note asks anyone changing this to check.
+
+**The heroes.**
+
+| hero | what moved | why |
+|---|---|---|
+| **Opera House** | **identical to the millimetre**, and so is its podium's founding ground (min over the plan 0.15 m AHD) and its stair riser (0.675 m over 22 treads) | the podium is a stated 16.0 m AHD platform and the ground under its plan was already at the water |
+| **Harbour Bridge** | `ramp_south_m` 275 → 290; `ramp_north_m` 85 → 80; `ramp_north_clearance_m` **9.935 → 10.698**; `deck_s_min` −849.5 → −864.5 | the deck is stated at 49.0 m AHD and does not move. The abutments stand on ground that did: ramp foot S 33.79 → 32.22, ramp foot N 33.99 → 33.06, arch pins 6.27 → 6.26 and 3.74 → 3.50 m AHD. The southern ramp runs 15 m further before it meets grade in The Rocks |
+| **Luna Park** | `base_y` −60.482 → −61.450 (10.59 → **9.62 m AHD**) | reclaimed foreshore inside the band; ~3 m AHD in life, so another metre the right way |
+| **Sydney Tower** | `base_y` −2.459 → −4.284 (**−1.83 m**) | the CBD coming down through the tie chain, not a post this operator wrote — its pad is Westfield's block, 585 m from mapped water. ~30 m AHD in life against a build that reads 40, so the direction is right and the magnitude is small, but **it is a hero moving and `landmark-audit` at 20 km has not been run for it** |
+
+**Grade.** `MAX_GRADE` is a guarantee about the *solved profile* and it is read
+back off the output: 15.000% both ways, zero edges over. On the lattice, in the
+shore band p95 19.17% → 18.96% and max 121.45% → 118.47%; city-wide p95 12.67% →
+12.68% and max the same 121.45 → 118.47. 9,304 cells got steeper, p95 2.92%.
+`road-grade-audit`'s centreline half, run through that command's own functions
+against the scoped solve, gets **better** on every line:
+
+| | symmetric | one-sided |
+|---|---|---|
+| carriageways over 15% of grade | 18 of 126,285 | **13** |
+| over 15% of bank | 36 | **24** |
+| worst grade / bank | 29.72% / 30.31% | **23.96% / 25.01%** |
+| the verdict share (limit 0.100%) | 0.026% | **0.017%** |
+| tidal-shore stations over 15% (excluded from the verdict) | 274 grade, 688 bank | **254, 678** |
+| solve vs ground, p50 / p95 / worst | 0.14 / 0.62 / 11.94 m | 0.15 / 0.64 / **10.30** |
+
+The emitted-facet half of that command reads `road_asphalt` out of shipped GLBs
+and a scoped solve emits none; it is `road-grade-audit --surface tiles` after a
+retile and it was not run.
+
+**What Circular Quay's station ground becomes.** The node is E 86.6 N 818.4 and
+its ground goes **30.56 → 20.36 m AHD, −10.20 m** from what ships today — and
+37.24 → 20.36, **−16.88 m**, from where §3d's round found it. §3c records the
+shipped 20 km bake there at `groundY` 37.23 AHD with `clearance` −6.74 and the
+conflict recorded. `rail.raw_heights` gives a bridge node
+`terrain.sample(...) + BRIDGE_RISE` at 7.0 m, so the deck follows the ground down
+and only what the 3.3% grade projection restores from approaches that did not
+move survives; Chatswood measured that exchange rate at 0.38. So 16.88 m of
+ground is worth between **+6.41 and +16.88 m** of clearance, and Circular Quay
+goes from −6.74 to somewhere in **−0.33 .. +10.14 m**. **The bottom of that band
+is at the deck and the top of it clears by ten metres** — which is the first time
+since §3a that either end has. It is still a band and not a number: the measured
+one is `roadgrade-sign-check.py --radius 20000`, and this round did not run it.
+The conflict §3c forbade editing away therefore stays recorded until a 20 km bake
+says otherwise.
+
+**What this does not fix, and what it costs.**
+
+- **The middle of the CBD.** Town Hall is −1.14 m against ~11 m of error. This
+  operator has no correction of its own to make: it decides how much of somebody
+  else's survives, and in the middle of the CBD nobody has made one yet. The
+  city-wide deconvolution is still `terrain.py`'s standing follow-up and
+  `shoreline.SHORE_REACH_M`'s 600 m row is still the one to take next.
+- **Two heroes move on evidence gathered at 5.3 km.** Luna Park and Sydney Tower
+  both come down and both come down toward the truth, and `landmark-audit` and
+  `rail-audit` at 20 km were not run this round. Neither was a retile.
+- **Every terrain cache entry is invalidated.** `roadgrade.py` is in
+  `terraincache._CODE_FILES`, so the next build re-solves the lattice — the price
+  that file's header already states for an edit here.
+- **`bare-earth-check.py`, `terrain-rules-check.py` and `shoreline-check.py` were
+  all re-run at 5.3 km against this branch and all three still PASS**, gate and
+  all, the way §3d re-ran the first two.
 
 ### 4. Access is generated, never looked up
 

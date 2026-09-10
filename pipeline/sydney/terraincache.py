@@ -23,7 +23,9 @@ from it is byte-identical -- which is the gate this change lives or dies by.
 THE KEY, AND WHY IT IS PARANOID. The key hashes exactly the inputs the solved
 lattice depends on:
 
-  * the load arguments (`radius_m`, `zoom`, the three conform flags);
+  * the load arguments (`radius_m`, `zoom`, and every one of the six flags --
+    `sign` joined them with the one-sided Lipschitz projection, which is not a
+    pass but does decide the height of every street in the city);
   * the OSM extract, by full content hash -- a re-pull changes the roads and the
     water and must miss;
   * the DEM tiles for this zoom, by a (name, size, mtime) signature -- terrarium
@@ -133,6 +135,7 @@ def _key(
     conform_pads: bool,
     bare_earth: bool,
     shoreline: bool,
+    one_sided: bool,
 ) -> str:
     pbf = config.CACHE_DIR / "sydney.osm.pbf"
     pbf_hash = _file_hash(str(pbf)) if pbf.exists() else "no-pbf"
@@ -146,6 +149,7 @@ def _key(
             f"pads={int(conform_pads)}",
             f"bare={int(bare_earth)}",
             f"shore={int(shoreline)}",
+            f"sign={int(one_sided)}",
             f"pbf={pbf_hash}",
             f"dem={_dem_signature(zoom)}",
             f"code={_code_signature()}",
@@ -166,6 +170,7 @@ def load(
     conform_pads: bool = True,
     bare_earth: bool = True,
     shoreline: bool = True,
+    one_sided: bool = True,
     use_cache: bool = True,
 ) -> Terrain:
     """`Terrain.load` with a solved-lattice cache in front of it.
@@ -178,11 +183,12 @@ def load(
         print("  terrain cache: off, solving fresh")
         return Terrain.load(
             radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth,
-            shoreline,
+            shoreline, one_sided,
         )
 
     key = _key(
-        radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth, shoreline
+        radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth,
+        shoreline, one_sided,
     )
     cache_dir = config.CACHE_DIR / _CACHE_SUBDIR
     path = cache_dir / f"{key}.pkl"
@@ -199,7 +205,8 @@ def load(
 
     print(f"  terrain cache: MISS {key[:12]}, solving fresh")
     terrain = Terrain.load(
-        radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth, shoreline
+        radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth,
+        shoreline, one_sided,
     )
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)

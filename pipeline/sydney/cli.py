@@ -3633,6 +3633,9 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
         # a call that named only three read a hybrid nobody chose -- the raw
         # drape with two later passes' corrections still in it -- for five days.
         # A `raw` column means every pass off; anything else means every pass on.
+        # `one_sided` is not a pass -- it is the projection inside the road solve
+        # -- but it is named here anyway and for the same reason: the day it is
+        # left out is the day this column is a hybrid again.
         field = Terrain.load(
             radius,
             conform_roads=conform,
@@ -3640,6 +3643,7 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
             conform_pads=conform,
             bare_earth=conform,
             shoreline=conform,
+            one_sided=conform,
         )
         label = "a fresh lattice, " + (
             "roads conformed" if conform else "roads NOT conformed (the before)"

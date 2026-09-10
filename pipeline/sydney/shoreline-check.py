@@ -25,11 +25,18 @@ Seven sections:
   2. **The Quay transect.** East 140, north 1200 down to 560 -- the middle of
      Sydney Cove, over the promenade and the ferry wharves, across Alfred
      Street to the Cahill viaduct -- off, on, and what is there in life.
-  3. **What the road solve gives back**, which is the finding this round turned
-     up and the reason section 2 is not a bigger table. `roadgrade._lipschitz`
-     is the average of a downward projection and an upward one; the DSM's error
-     is only ever upward; so roughly half of whatever this pass takes off the
-     shore is handed back by a tie chain to the CBD. Measured, per station.
+  3. **What the road solve gives back.** When this file was written it was the
+     finding the round turned up and the reason section 2 was not a bigger
+     table: `roadgrade._lipschitz` averaged a downward projection with an upward
+     one, the DSM's error is only ever upward, and a tie chain handed roughly
+     half of whatever this pass took off the shore back to the CBD -- median
+     kept/written **0.41**. That is fixed, in `roadgrade.py`'s one-sided
+     projection and RAIL-VERTICAL.md section 3e, and the section stays because
+     the measurement is the one that would notice it coming back. It now reads
+     **1.13**, and past one it has stopped meaning "how much survives" and
+     started meaning "what a corrected shore is worth", because the correction
+     now propagates inland along the grade limit instead of stopping at the
+     band. `roadgrade-sign-check.py` is that operator's own gate.
   4. **The grade this puts into the lattice.** The pass has no reach feather --
      it terminates because its weight reaches zero -- and what that trades is
      gradient inside the band.
@@ -226,12 +233,15 @@ def section_transect(off, on) -> tuple[list[str], np.ndarray, np.ndarray]:
 
 def section_giveback(pre_off, pre_on, on, g_off, g_on) -> list[str]:
     print("\n3. WHAT THE ROAD SOLVE GIVES BACK")
-    print("   `roadgrade._lipschitz` is the average of a downward projection and an")
+    print("   `roadgrade._lipschitz` used to average a downward projection with an")
     print("   upward one -- 'cutting a spike down and filling the valleys either side")
     print("   of it up are both legal answers and the truth is between them'. The DSM's")
-    print("   error is only ever upward (`roadgrade.OPENING_M`'s own note says so), and")
-    print("   the CBD's is 1.5 km wide and still there. So a tie chain at CROSS_GRADE")
-    print("   hands roughly half of whatever this pass takes off the shore straight back.")
+    print("   error is only ever upward (`roadgrade.OPENING_M`'s own note says so), so a")
+    print("   tie chain at CROSS_GRADE handed roughly half of whatever this pass took")
+    print("   off the shore straight back to the CBD: median kept/written 0.41.")
+    print("   It is one-sided now -- see that module's `--- The sign of the error ---`")
+    print("   block and RAIL-VERTICAL 3e -- and this is where it would show up coming")
+    print("   back. Past 1.00 the ratio has stopped meaning 'how much survives'.")
     b = pre_on.base_elevation
     e = np.full_like(QUAY_NORTHS, QUAY_EAST)
     p_off = np.asarray(pre_off.sample(e, QUAY_NORTHS), dtype=float) + b
@@ -255,10 +265,10 @@ def section_giveback(pre_off, pre_on, on, g_off, g_on) -> list[str]:
     if keeps:
         print(f"\n   median kept / written, on dry land the pass wrote over a metre to: "
               f"{np.median(keeps):.2f}")
-        print("   The rest is in the CBD, where this rule does not reach and the DSM still")
-        print("   reads 40 to 55 m. Two follow-ups, in `terrain.py`'s and `roadgrade.py`'s")
-        print("   own words: the city-wide deconvolution, and a Lipschitz projection that")
-        print("   knows the error it is averaging over has a sign.")
+        print("   What is left is in the middle of the CBD, where this rule does not reach,")
+        print("   nothing has corrected the ground, and the DSM still reads 40 to 55 m. One")
+        print("   follow-up now, in `terrain.py`'s own words and still standing: the")
+        print("   city-wide deconvolution. The projection's half is done.")
     return []
 
 

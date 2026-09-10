@@ -144,11 +144,13 @@ was already 19.98%.
 ---------------------------------------------------------------------------
 ## What it does not buy, which is most of it, and where the rest went
 
-**The pass writes 11.48 m at the Quay promenade and the build keeps 5.63.** That
-is not a rounding loss and it is the finding this round turned up, so it is
+**The pass wrote 11.48 m at the Quay promenade and the build kept 5.63.** That
+was not a rounding loss and it was the finding this round turned up, so it is
 stated here rather than discovered again later. Measured on the transect, dry
 land only, over every station the pass wrote more than a metre to: the median
-**kept / written is 0.41**.
+**kept / written was 0.41**. It is **1.13** today, and the paragraphs below are
+kept in the past tense rather than deleted, because the argument they make is
+what the operator that replaced it has to keep being true.
 
 The mechanism is `roadgrade._lipschitz`, and its own docstring is the argument
 against it:
@@ -169,7 +171,9 @@ street nearest east 140 north 820 goes 31.31 -> 25.63 m AHD, a 5.68 m fall for
 an 11.5 m correction, and it stands 20 m above its own ground.
 
 **So this pass is necessary and it is not sufficient**, and the two things that
-would finish it are both already named in other files' headers:
+would finish it were both already named in other files' headers. One of them has
+since been built and the note is kept because it is where anyone chasing the
+other will look:
 
   * **the city-wide deconvolution** -- `terrain.py`'s standing follow-up and
     `bareearth.py`'s ("applying it city-wide is still the follow-up; what exists
@@ -180,6 +184,12 @@ would finish it are both already named in other files' headers:
     the observation is a surface model over a city, symmetric elsewhere. That is
     a change to every street in Sydney and it belongs to whoever owns
     `roadgrade.py`, with `road-grade-audit` as its gate.
+    **Built, 2026-09-10** -- `roadgrade.py`'s `--- The sign of the error ---`
+    block, gated by `roadgrade-sign-check.py`, RAIL-VERTICAL.md section 3e. It
+    reads this pass's own two numbers as its confidence, which is why
+    `conform` takes an `evidence` argument. The Quay promenade goes 26.42 ->
+    **15.18 m AHD** and Circular Quay's station ground 37.24 -> **20.36**. What
+    is left of the thirty metres is the first bullet's and the DSM's own ten.
 
 **The last few metres at the Quay, even before the road solve takes its half.**
 The pass's own write comes out at 6.34 m AHD on the promenade against 2.5 in
@@ -403,6 +413,7 @@ def conform(
     zoom: int,
     sample,
     record: list,
+    evidence=None,
 ) -> dict:
     """Pull the shore down to the water it fronts. In place.
 
@@ -418,6 +429,16 @@ def conform(
     `+inf` past the reach -- so a post outside the band pays a logarithmic query
     and nothing else, and the two modules cannot disagree about how far from the
     water a post is.
+
+    **`evidence`, when it is given, is a `roadgrade.GroundEvidence`** and this
+    pass reports two of its own numbers into it: the deconvolved built mass at
+    every post of the band, and the band's own weight. Neither is computed for
+    it -- both are already the floor and the pull of the `min`/`max` below -- and
+    the reason it is reported at all is `roadgrade.py`'s `--- The sign of the
+    error ---` block. The road solve is about to decide, at every post this pass
+    just wrote, whether the error it is projecting has a sign, and this pass is
+    the one that measured it. `None` is not a switch on this pass; it means
+    nobody downstream asked.
     """
     sea = -base_elevation
     geom = tidal_geometry(radius_m, sample, sea)
@@ -459,6 +480,14 @@ def conform(
     moved = natural - new
     flat[band] = new
     heights[:] = flat.reshape(heights.shape).astype(heights.dtype)
+
+    if evidence is not None:
+        # The two numbers the `min`/`max` above was already made of, handed on
+        # rather than recomputed. `bd` is the deconvolution's own answer to "how
+        # much building is the DSM looking at here" and `w` is how much of a
+        # shore this post is; the road solve's projection reads them as the
+        # confidence that the error it is about to clamp has a sign.
+        evidence.built(band, bd, w)
 
     hit = moved > 0.0
     stats = {
