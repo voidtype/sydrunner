@@ -536,11 +536,142 @@ export function buildBands(
     const sides = way.footpathWidth < NARROW_FOOTPATH_M ? 1 : 2;
     const offset = way.halfWidth + KERB_WIDTH + way.footpathWidth * 0.5;
     for (let side = 0; side < sides; side++) {
-      const band = buildBand(way, side, offset, density);
-      if (band !== null) out.push(band);
+      // `bandInset` and `bandCuts` are the bake's, not this file's: a band that
+      // runs through a parked car is corrected once in `pipeline/sydney/
+      // footbands.py`, against every bay in reach, and read here. See
+      // `traffic.LANES_VERSION`'s v4 note for why it cannot be derived. Zero
+      // and empty on a v2 or v3 world, which is the behaviour that shipped.
+      const band = buildBand(way, side, offset + way.bandInset[side], density);
+      if (band === null) continue;
+      const cuts = way.bandCuts[side];
+      if (cuts.length === 0) {
+        out.push(band);
+        continue;
+      }
+      for (const piece of splitBand(band, cuts, density)) out.push(piece);
     }
   }
   return out;
+}
+
+/**
+ * One band, minus the stretches nobody walks: the surviving runs, as bands.
+ *
+ * The cuts arrive in the **way's vertex-index space** and the band has one
+ * vertex per way vertex, so a cut names a range of this band's own vertices
+ * directly -- that is the whole reason the bake writes index space rather than
+ * arc length, and `footbands.py` says so. A run shorter than `MIN_BAND_M` is
+ * dropped exactly as `buildBand` drops a short way: a six-metre stub of
+ * footpath between two cars is not a place anybody walks up and down.
+ *
+ * Every piece is a fresh band with its own seed, because `bandSeed` is a
+ * function of the first point and the pieces start in different places. That is
+ * correct rather than merely convenient: two pieces of one footpath must not
+ * schedule the same walker twice.
+ */
+function splitBand(band: PedBand, cuts: Float32Array, density: number): PedBand[] {
+  const out: PedBand[] = [];
+  const last = band.count - 1;
+  let at = 0;
+  for (let c = 0; c <= cuts.length; c += 2) {
+    const to = c < cuts.length ? cuts[c] : last;
+    if (to - at > 1e-6) {
+      const piece = sliceBand(band, at, Math.min(to, last), density);
+      if (piece !== null) out.push(piece);
+    }
+    if (c < cuts.length) at = Math.max(at, cuts[c + 1]);
+  }
+  return out;
+}
+
+/**
+ * A band between two index-space positions, as a band in its own right.
+ *
+ * Arc length, per-segment directions, slots and bounds are all recomputed off
+ * the sliced polyline rather than carried over and adjusted, because every one
+ * of them is a function of the points and a carried-over `s` would be measured
+ * from a vertex this piece no longer has.
+ */
+function sliceBand(band: PedBand, t0: number, t1: number, density: number): PedBand | null {
+  const i0 = Math.floor(t0);
+  const i1 = Math.min(band.count - 1, Math.ceil(t1));
+  // The interior vertices, plus a cut end wherever the range starts or stops
+  // part-way along a segment.
+  const head = t0 > i0 ? 1 : 0;
+  const tail = t1 < i1 ? 1 : 0;
+  const inner0 = head === 1 ? i0 + 1 : i0;
+  const inner1 = tail === 1 ? i1 - 1 : i1;
+  const n = head + Math.max(0, inner1 - inner0 + 1) + tail;
+  if (n < 2) return null;
+  const x = new Float32Array(n);
+  const y = new Float32Array(n);
+  const z = new Float32Array(n);
+  let w = 0;
+  const put = (t: number): void => {
+    const i = Math.min(band.count - 2, Math.max(0, Math.floor(t)));
+    const f = t - i;
+    x[w] = band.x[i] + (band.x[i + 1] - band.x[i]) * f;
+    y[w] = band.y[i] + (band.y[i + 1] - band.y[i]) * f;
+    z[w] = band.z[i] + (band.z[i + 1] - band.z[i]) * f;
+    w++;
+  };
+  if (head === 1) put(t0);
+  for (let i = inner0; i <= inner1; i++) {
+    x[w] = band.x[i];
+    y[w] = band.y[i];
+    z[w] = band.z[i];
+    w++;
+  }
+  if (tail === 1) put(t1);
+
+  const s = new Float32Array(n);
+  const ux = new Float32Array(n - 1);
+  const uz = new Float32Array(n - 1);
+  let total = 0;
+  for (let i = 0; i + 1 < n; i++) {
+    const sx = x[i + 1] - x[i];
+    const sz = z[i + 1] - z[i];
+    const d2 = sx * sx + sz * sz;
+    if (d2 < 1e-12) {
+      ux[i] = i > 0 ? ux[i - 1] : 1;
+      uz[i] = i > 0 ? uz[i - 1] : 0;
+    } else {
+      const inv = 1 / Math.sqrt(d2);
+      ux[i] = sx * inv;
+      uz[i] = sz * inv;
+      total += Math.sqrt(d2);
+    }
+    s[i + 1] = total;
+  }
+  if (!(total >= MIN_BAND_M)) return null;
+
+  const seed = bandSeed(band.osmId, band.side, x[0], z[0]);
+  let slots = Math.floor(total * density + unit(carHash(seed, 0x5107)));
+  if (slots < 0) slots = 0;
+  if (slots > MAX_SLOTS) slots = MAX_SLOTS;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < n; i++) {
+    if (x[i] < minX) minX = x[i];
+    if (x[i] > maxX) maxX = x[i];
+    if (z[i] < minZ) minZ = z[i];
+    if (z[i] > maxZ) maxZ = z[i];
+  }
+  return {
+    osmId: band.osmId,
+    side: band.side,
+    klass: band.klass,
+    seed,
+    count: n,
+    x, y, z, s, ux, uz,
+    length: total,
+    slots,
+    minX, maxX, minZ, maxZ,
+    mark: 0,
+  };
 }
 
 /** Scratch for the averaged vertex directions. Grown, never shrunk; build-time only. */
@@ -1613,7 +1744,13 @@ function land(
  */
 export function verifyPedestrians(
   kitCount?: number,
-  contract?: { kerb_width_m?: number; footpath_y_m?: number; carriageway_y_m?: number } | null,
+  contract?: {
+    kerb_width_m?: number;
+    footpath_y_m?: number;
+    carriageway_y_m?: number;
+    /** v4. See the band block in `traffic.LANES_VERSION`. */
+    band_clear_m?: number;
+  } | null,
   caps?: { rigs: number; impostors: number },
 ): string[] {
   const failures: string[] = [];
@@ -1649,6 +1786,17 @@ export function verifyPedestrians(
     }
     if (contract.carriageway_y_m !== undefined && contract.carriageway_y_m !== CARRIAGEWAY_Y) {
       failures.push(`The world's carriageway sits at ${contract.carriageway_y_m} m and this build derives the footpath lift from ${CARRIAGEWAY_Y} m.`);
+    }
+    // v4. The band block was fitted with a body radius, and it is this one --
+    // `pipeline/sydney/footbands.PED_CLEAR_M` is `CAPSULE_RADIUS` by value.
+    // A bake fitted with a wider body has cut footpath nobody needed cut, and a
+    // narrower one has left people standing in bumpers; neither shows up in any
+    // other check.
+    if (contract.band_clear_m !== undefined && contract.band_clear_m !== CAPSULE_RADIUS) {
+      failures.push(
+        `The world's footpath bands were fitted past the parked cars with a ${contract.band_clear_m} m ` +
+          `body and this build walks a ${CAPSULE_RADIUS} m one.`,
+      );
     }
   }
 
@@ -1696,6 +1844,79 @@ export function verifyPedestrians(
       if (left.x[0] * right.x[0] >= 0) {
         failures.push('Both bands of a two-way street landed on the same side of it.');
       }
+    }
+  }
+
+  // --- THE BAND BLOCK, v4. The inset moves the band and only the band, the cut
+  //     takes a piece out of the middle, and both come off the shipped bytes.
+  //
+  //     This is the other end of `pipeline/sydney/footbands.verify_footbands`,
+  //     deliberately: that file builds the same offset polyline this one does,
+  //     in Python, so that it can test the points people will actually be put
+  //     on -- and two implementations of one polyline drift. Each end asserts
+  //     the sign and the distance on its own synthetic way, so a change to
+  //     either that moves a band fails one of the two rather than quietly
+  //     filling a suburb with people walking down the middle of the street.
+  {
+    const expected = HALF + KERB_WIDTH + FOOT * 0.5;
+    const INSET = 0.6;
+    const inset = syntheticTileWith(HALF, FOOT, WAY_Y, 10, [INSET, 0], [[], []]);
+    const insetBands = inset === null ? [] : buildBands(inset, UNIFORM_CROWD);
+    const insetLeft = insetBands.find((b) => b.side === 0);
+    const insetRight = insetBands.find((b) => b.side === 1);
+    if (!insetLeft || !insetRight) {
+      failures.push('An inset band did not survive the round trip.');
+    } else {
+      // Away from the carriageway: the left band of a due-north way is west, so
+      // an inset makes x *more* negative. A sign error here is a band pushed
+      // into the road, which is the failure this exists to catch.
+      if (Math.abs(insetLeft.x[0] - -(expected + INSET)) > 1e-3) {
+        failures.push(
+          `A ${INSET} m inset put the left band at x = ${insetLeft.x[0].toFixed(3)}; away from the ` +
+            `carriageway is west, so it must be at ${(-(expected + INSET)).toFixed(3)}.`,
+        );
+      }
+      if (Math.abs(insetRight.x[0] - expected) > 1e-3) {
+        failures.push(`Insetting side 0 moved side 1 to x = ${insetRight.x[0].toFixed(3)}.`);
+      }
+    }
+
+    // A cut through the middle of a 200 m band, in **vertex-index space**: the
+    // way has ten vertices evenly over 200 m, so a segment is 200 / 9 m and the
+    // range 4.0 .. 5.0 is exactly the fifth segment. Stated as arithmetic
+    // rather than as metres, because index space is the thing under test.
+    const SEG = 200 / 9;
+    const cut = syntheticTileWith(HALF, FOOT, WAY_Y, 10, [0, 0], [[4, 5], []]);
+    const cutBands = cut === null ? [] : buildBands(cut, UNIFORM_CROWD);
+    const pieces = cutBands.filter((b) => b.side === 0);
+    if (pieces.length !== 2) {
+      failures.push(`A cut through the middle of a band produced ${pieces.length} pieces, not two.`);
+    } else {
+      const total = pieces[0].length + pieces[1].length;
+      if (Math.abs(total - (200 - SEG)) > 0.05) {
+        failures.push(
+          `A one-segment cut out of a 200 m band left ${total.toFixed(2)} m, not ${(200 - SEG).toFixed(2)}.`,
+        );
+      }
+      // ...and neither piece reaches into the cut. The way runs from z = 0 to
+      // z = -200, so the fifth segment is z = -4*SEG .. -5*SEG.
+      for (const p of pieces) {
+        for (let i = 0; i < p.count; i++) {
+          if (p.z[i] < -4 * SEG - 1e-3 && p.z[i] > -5 * SEG + 1e-3) {
+            failures.push(`A cut band still has a vertex at z = ${p.z[i].toFixed(2)}, inside the cut.`);
+            break;
+          }
+        }
+      }
+      if (pieces[0].seed === pieces[1].seed) {
+        failures.push('The two pieces of a cut band share a seed, so they schedule the same walkers.');
+      }
+    }
+    // A cut that leaves nothing walkable leaves no band, rather than a stub.
+    const whole = syntheticTileWith(HALF, FOOT, WAY_Y, 10, [0, 0], [[0.2, 8.8], []]);
+    const stub = whole === null ? [] : buildBands(whole, UNIFORM_CROWD).filter((b) => b.side === 0);
+    if (stub.length !== 0) {
+      failures.push(`A cut leaving two stubs under ${MIN_BAND_M} m still produced ${stub.length} band(s).`);
     }
   }
 
@@ -2157,6 +2378,20 @@ function syntheticTile(half: number, foot: number, wayY: number, points: number)
   return encodeWays([{ x: 0, z: 0, dz: -200, half, foot, y: wayY, points, klass: 10 }]);
 }
 
+/** The same street, carrying v4's band block. See `verifyPedestrians`. */
+function syntheticTileWith(
+  half: number,
+  foot: number,
+  wayY: number,
+  points: number,
+  inset: readonly [number, number],
+  cuts: readonly [readonly number[], readonly number[]],
+): TileLanes | null {
+  return encodeWays([
+    { x: 0, z: 0, dz: -200, half, foot, y: wayY, points, klass: 10, inset, cuts },
+  ]);
+}
+
 /** Eight 200 m streets on a 100 m pitch: four running north, four running east. */
 /**
  * Eight streets 200 m long on a 100 m pitch: roughly a CBD block structure,
@@ -2187,6 +2422,9 @@ interface SyntheticWay {
   y: number;
   points: number;
   klass: number;
+  /** v4's band block. See `traffic.LANES_VERSION`; zero and empty by default. */
+  inset?: readonly [number, number];
+  cuts?: readonly [readonly number[], readonly number[]];
 }
 
 /**
@@ -2198,7 +2436,10 @@ interface SyntheticWay {
  */
 function encodeWays(ways: SyntheticWay[], originX = 0, originZ = 0): TileLanes | null {
   let bytes = 16;
-  for (const w of ways) bytes += 16 + w.points * 12;
+  for (const w of ways) {
+    const cuts = (w.cuts?.[0].length ?? 0) + (w.cuts?.[1].length ?? 0);
+    bytes += 16 + (LANES_VERSION >= 4 ? 12 : 0) + w.points * 12 + cuts * 4;
+  }
   const buffer = new ArrayBuffer(bytes);
   const v = new DataView(buffer);
   v.setUint32(0, 0x454e414c, true); // 'LANE'
@@ -2219,6 +2460,15 @@ function encodeWays(ways: SyntheticWay[], originX = 0, originZ = 0): TileLanes |
     v.setFloat32(o + 8, w.half, true);
     v.setFloat32(o + 12, w.foot, true);
     o += 16;
+    const cuts0 = w.cuts?.[0] ?? [];
+    const cuts1 = w.cuts?.[1] ?? [];
+    if (LANES_VERSION >= 4) {
+      v.setFloat32(o, w.inset?.[0] ?? 0, true);
+      v.setFloat32(o + 4, w.inset?.[1] ?? 0, true);
+      v.setUint16(o + 8, cuts0.length / 2, true);
+      v.setUint16(o + 10, cuts1.length / 2, true);
+      o += 12;
+    }
     for (let i = 0; i < w.points; i++) {
       const t = i / (w.points - 1);
       v.setFloat32(o, w.x + (w.dx ?? 0) * t, true);
@@ -2226,6 +2476,8 @@ function encodeWays(ways: SyntheticWay[], originX = 0, originZ = 0): TileLanes |
       v.setFloat32(o + 8, w.z + (w.dz ?? 0) * t, true);
       o += 12;
     }
+    for (const t of cuts0) { v.setFloat32(o, t, true); o += 4; }
+    for (const t of cuts1) { v.setFloat32(o, t, true); o += 4; }
   }
   // The routes block is empty, so the crowd function is never consulted here --
   // the origin is what moves this street to Redfern or to Dural, and it is the

@@ -506,6 +506,13 @@ export interface WorldIndex {
     kerb_width_m?: number;
     carriageway_y_m?: number;
     footpath_y_m?: number;
+    /**
+     * v4. The body radius `pipeline/sydney/footbands.py` fitted the band
+     * block past the parked cars with, and the widest inset it was allowed.
+     * Optional on the same terms as the three above.
+     */
+    band_clear_m?: number;
+    band_inset_max_m?: number;
   };
   /**
    * The hexagonal segments this world is cut into, from `root.json`.

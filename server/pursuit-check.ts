@@ -240,6 +240,10 @@ function suburbWorld(): ServerWorld {
     x: r.x,
     y: r.y,
     z: r.z,
+    // v4's band block. Nothing is parked in this fixture, so the band needs no
+    // inset and no cut -- see `game/traffic.LANES_VERSION`.
+    bandInset: [0, 0],
+    bandCuts: [new Float32Array(0), new Float32Array(0)],
   }));
   traffic.adopt('suburb', { ways, routes });
   return {

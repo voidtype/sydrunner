@@ -52,6 +52,7 @@ from . import (
     decks,
     elevated,
     fences,
+    footbands,
     furniture,
     geo,
     hexes,
@@ -532,7 +533,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # `driving.NOSE_STEP` climbs, the creek stand against the reach length -- and
     # a retile is hours, so the moment to find out that one of them moved is now
     # rather than at the end. They cost milliseconds and touch no data.
-    gate = decks.verify_decks() + creeks.verify_creeks()
+    gate = decks.verify_decks() + creeks.verify_creeks() + footbands.verify_footbands()
     for failure in gate:
         print(f"  SELF-CHECK   {failure}")
     if gate:
@@ -874,6 +875,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # `results` and not off the keep-out's own tally, which is a child process's
     # -- see `carriageway.report`, where that mistake is written down.
     print(carriageway.report(keep_out, results))
+    _report_footbands(results)
     _report_powerups(powerup_network)
     _report_awnings(awning_network)
     _report_doors(door_network)
@@ -1933,6 +1935,31 @@ def _report_furniture(
                 f" instances -- see furniture.{const}."
             )
 
+
+
+def _report_footbands(results: list[tiles.TileResult]) -> None:
+    """What the footpath bands cost to keep out of the parked cars.
+
+    Summed off `results` and not off a network's tally, on `carriageway.report`'s
+    reasoning and for its exact reason: `footbands.fit_tile` runs inside the
+    tile loop, the tile loop runs on a `fork` pool, and a counter incremented in
+    a child never reaches the parent's report.
+
+    A zero `blocked` here means one of two things and they are worth telling
+    apart: no band met a bay, or the pass was never attached. The line prints
+    unconditionally so that the second cannot look like the first.
+    """
+    blocked = sum(r.band_blocked for r in results)
+    inset = sum(r.band_inset for r in results)
+    cut = sum(r.band_cut for r in results)
+    refused = sum(r.band_refused for r in results)
+    lost = sum(r.band_lost_m for r in results)
+    print(
+        f"  footpath bands: {blocked:,} ran through a parked car;"
+        f" {inset:,} cleared by an inset (max {footbands.INSET_MAX_M:.1f} m),"
+        f" {cut:,} cut instead ({lost:,.0f} m of band),"
+        f" {refused:,} insets a building refused"
+    )
 
 
 def _report_lanes(net) -> None:
@@ -4586,17 +4613,31 @@ def _decode_lanes(key: str):
     magic, version, n_ways, n_routes = struct.unpack_from("<IIII", buf, 0)
     if magic != tiles.LANES_MAGIC:
         return f"magic {magic:#x}"
-    if version not in (2, tiles.LANES_VERSION):
+    if version not in (2, 3, tiles.LANES_VERSION):
         return f"version {version}"
     o = 16
     ways, routes = [], []
     for _ in range(n_ways):
         osm_id, klass, flags, n, half, foot = struct.unpack_from("<IBBHff", buf, o)
         o += 16
+        # The band block, v4. Read rather than skipped for the same reason the
+        # park block below is: a wrong offset here decodes every point in the
+        # file as a plausible street somewhere else, which is a failure this
+        # audit would report as geometry rather than as a format.
+        inset = (0.0, 0.0)
+        n_cuts = 0
+        if version >= 4:
+            i0, i1, c0, c1 = struct.unpack_from("<ffHH", buf, o)
+            inset = (i0, i1)
+            n_cuts = c0 + c1
+            o += 12
         pts = np.frombuffer(buf, dtype="<f4", count=n * 3, offset=o).reshape(n, 3)
         o += n * 12
+        cuts = np.frombuffer(buf, dtype="<f4", count=n_cuts * 2, offset=o).reshape(n_cuts, 2)
+        o += n_cuts * 8
         ways.append({"osm_id": osm_id, "klass": klass, "oneway": bool(flags & 1),
-                     "half": half, "foot": foot, "p": pts.astype(np.float64)})
+                     "half": half, "foot": foot, "p": pts.astype(np.float64),
+                     "inset": inset, "cuts": cuts.astype(np.float64)})
     for _ in range(n_routes):
         rid, klass, flags, n, headway, phase = struct.unpack_from("<IBBHff", buf, o)
         o += 16

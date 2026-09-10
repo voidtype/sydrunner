@@ -55,6 +55,7 @@ from . import (
     creeks,
     decks,
     fences,
+    footbands,
     furniture,
     lanes,
     mesh,
@@ -202,6 +203,18 @@ class TileResult:
     # `instances` never leaves the child, and the parent's report would read 0
     # whether the sweep fired or was never attached. See `carriageway.report`.
     carriageway_dropped: int = 0
+    # What `footbands.fit_tile` did to this tile's footpath bands: how many ran
+    # through a bay box, how many were cleared by pushing the band off the kerb,
+    # how many had to be cut instead, how many insets a building refused, and
+    # the metres of band the cuts cost. Here rather than on a network's own
+    # tally for `carriageway_dropped`'s reason, which is stated above and is the
+    # fork pool: a counter incremented inside the tile loop never leaves the
+    # child. See `cli._report_footbands`.
+    band_blocked: int = 0
+    band_inset: int = 0
+    band_cut: int = 0
+    band_refused: int = 0
+    band_lost_m: float = 0.0
 
 
 def _accessor_min_max(arr: np.ndarray, components: int) -> tuple[list[float], list[float]]:
@@ -1514,7 +1527,12 @@ def _pack_water(sheets: list, origin: tuple[float, float] | None) -> bytes:
     return bytes(out)
 
 
-def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) -> tuple[int, int, int]:
+def write_lanes(
+    path: Path,
+    tile: lanes.TileLanes,
+    origin: tuple[float, float],
+    fits: dict | None = None,
+) -> tuple[int, int, int]:
     """The drivable street network and the traffic timetable on it.
 
         u32  magic         `LANES_MAGIC`, ASCII 'LANE' little-endian
@@ -1522,15 +1540,22 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
         u32  way count
         u32  route count
 
-        per way (16-byte header, then 12 bytes a point):
+        per way (28-byte header, then 12 bytes a point, then 8 bytes a cut):
           u32  osmId          OSM way id truncated to 32 bits, 0 when unknown
           u8   klass          index into `lanes.LANE_CLASSES`
           u8   flags          bit 0: one-way
           u16  point count
           f32  halfWidth      centreline to kerb, metres
           f32  footpathWidth  the paved band beyond the kerb, 0 where none
+          f32  bandInset0     v4: metres side 0's footpath band is pushed
+          f32  bandInset1          away from the carriageway. See `footbands.py`
+          u16  bandCuts0      v4: stretches of side 0's band nobody walks
+          u16  bandCuts1
           per point:
             f32  x, f32 y, f32 z
+          per cut (side 0's first, then side 1's):
+            f32  t0, f32 t1   the way's own vertex-index space -- 2.5 is halfway
+                              along the third segment
 
         per route (16-byte header, 24-byte park block, 12-byte chain block, then 16 bytes a point):
           u32  rid            stable route id; the hash seed for its cars
@@ -1599,6 +1624,16 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
     widths written here are read out of `streets.py` at build time for exactly
     that reason. Unlike a route, a way span **is** clipped to its own tile.
 
+    **The band inset and the band cuts are a correction to that derivation, and
+    they are here rather than at decode time for the reason the park block is.**
+    A pedestrian is a closed-form function with no mover, so a band that runs
+    through a parked car is people walking through parked cars, and the bay that
+    does it always belongs to a *different* way -- which is a fact no per-tile,
+    per-way derivation on the client can see. `footbands.py` arbitrates it once,
+    here, against every bay in reach and every footprint the band could be
+    pushed into, and the client reads the answer. Zero and empty on every way
+    that needed nothing, which is 99% of them.
+
     Returns (ways, routes, bytes); deletes the file and returns zeroes for a tile
     with no drivable street on it, so a stale sidecar can never outlive the tile
     that produced it.
@@ -1612,18 +1647,27 @@ def write_lanes(path: Path, tile: lanes.TileLanes, origin: tuple[float, float]) 
     out = bytearray(
         struct.pack("<IIII", LANES_MAGIC, LANES_VERSION, len(tile.ways), len(tile.routes))
     )
-    for w in tile.ways:
+    for wi, w in enumerate(tile.ways):
+        fit = fits.get(wi) if fits else None
+        cuts0 = fit.cuts[0] if fit else []
+        cuts1 = fit.cuts[1] if fit else []
         out += struct.pack(
-            "<IBBHff",
+            "<IBBHffffHH",
             int(w.osm_id) & 0xFFFFFFFF,
             lanes.class_index(w.highway),
             1 if w.oneway else 0,
             len(w.pts) & 0xFFFF,
             float(w.half_width),
             float(w.footpath_width),
+            float(fit.inset[0]) if fit else 0.0,
+            float(fit.inset[1]) if fit else 0.0,
+            len(cuts0) & 0xFFFF,
+            len(cuts1) & 0xFFFF,
         )
         for (e, n), y in zip(w.pts, w.y):
             out += struct.pack("<fff", float(e - oe), float(y), float(-(n - on)))
+        for t0, t1 in list(cuts0) + list(cuts1):
+            out += struct.pack("<ff", float(t0), float(t1))
     for r in tile.routes:
         # A joint never parks: the bay the arbitration may have given it is
         # dropped here rather than left for the client to ignore.
@@ -2055,8 +2099,28 @@ def build_tile(
     tile_lanes = (
         lane_network.instances(tile_key) if lane_network is not None else lanes.TileLanes()
     )
+    # And the correction the footpath bands need before anybody walks them: the
+    # bays in reach, the footprints they must not be pushed into, and the two
+    # numbers per way per side that come out of the two. Asked here rather than
+    # inside `write_lanes` because it needs the parking and street networks and
+    # the sidecar writer needs neither -- and the bays are taken from
+    # `cars_near` rather than from this tile's `cars` above, because a bay two
+    # metres over the tile line is still in the way of a walker on this side of
+    # it. `power.py` reads it for the same reason and says so.
+    fits: dict = {}
+    band_stats = footbands.new_stats()
+    if tile_lanes.ways and parking_network is not None:
+        from shapely.geometry import box as _box
+
+        reach = footbands.BAY_HALF_LENGTH_M + footbands.INSET_MAX_M + 4.0
+        region = _box(*streets._tile_bounds(tile_key)).buffer(reach)
+        bays = footbands.BayField(parking_network.cars_near(region))
+        walls = footbands.WallField(
+            street_network.buildings_near(region) if street_network is not None else []
+        )
+        fits = footbands.fit_tile(tile_lanes, bays, walls, band_stats)
     lane_ways, lane_routes, lanes_bytes = write_lanes(
-        config.TILE_DIR / f"{tile_key}.lanes.bin", tile_lanes, origin
+        config.TILE_DIR / f"{tile_key}.lanes.bin", tile_lanes, origin, fits
     )
 
     # The water. Read off the terrain rather than passed in, because the polygons
@@ -2179,6 +2243,11 @@ def build_tile(
         ground_min=float(ground.min()),
         ground_max=float(ground.max()),
         carriageway_dropped=lines.carriageway_dropped + props.carriageway_dropped,
+        band_blocked=band_stats["blocked"],
+        band_inset=band_stats["inset"],
+        band_cut=band_stats["cut"],
+        band_refused=band_stats["refused_by_wall"],
+        band_lost_m=band_stats["lost_m"],
     )
 
 
