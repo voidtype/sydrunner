@@ -42,6 +42,13 @@ follows them.** Two halves, and each has its own section below.
   2. `conform` pulls the terrain lattice onto that surface under every road
      corridor, with a feather band back to natural ground beyond it.
 
+Since 2026-09-10 the clamp inside the first half is **one-sided where the sign
+of the error is known**, which is the `--- The sign of the error ---` block and
+RAIL-VERTICAL.md section 3e. In one sentence: the projection used to average a
+downward answer with an upward one, that average handed 59% of every metre
+`shoreline.py` took off the foreshore straight back to it through a tie chain,
+and the average is only right when nobody knows which way the error goes.
+
 The second half is why this is a module and not a flag on `streets.py`. The road
 mesh is draped on the terrain (`streets._emit_flat` cuts it against the terrain's
 own facets and lifts it 2 cm), so a road cannot be flattened on its own without
@@ -214,6 +221,235 @@ TIE_NEIGHBOURS = 32
 # sweep, so this is the longest shadow the clamp can cast: 400 stations is 4 km
 # of road, which is longer than any continuous run in the extent.
 MAX_SWEEPS = 400
+
+# --- The sign of the error ----------------------------------------------------
+#
+# **`_lipschitz` used to average a downward projection with an upward one, and
+# the docstring's own justification -- "both legal answers and the truth is
+# between them" -- is a statement about an error of unknown sign. This error has
+# a sign.** `OPENING_M`'s note two hundred lines above says it in five words,
+# *contamination is always upward*; so does `bareearth.BUILT_COEFF`'s; so does
+# `shoreline.py`'s `np.minimum(natural, ...)`, which is a pass that may lower the
+# ground and may never raise it.
+#
+# What the average cost was measured by the round that built `shoreline.py`, at
+# the one place the truth is written down. The shore pass takes **11.48 m** off
+# the Quay promenade and the build kept **5.63** -- median kept/written 0.41
+# over every station on dry land it wrote more than a metre to. The mechanism is
+# exactly the average: the shore comes down eleven metres, the CBD three hundred
+# metres away stays at fifty, the `CROSS_GRADE` tie chain between them is
+# violated, `low` pulls the CBD down, `high` pulls the shore back up, and the
+# average splits an error that is **entirely the CBD's** evenly between the two.
+# The solved street nearest east 140 north 820 went 31.31 -> 25.63 m AHD and
+# ended up standing twenty metres above its own ground. RAIL-VERTICAL.md section
+# 3d records all of it and names the fix as this module's.
+#
+# **The fix is not a global switch to the downward projection.** `low` alone is
+# `TIE_RADIUS_M`'s table read at a cap of zero: it shaves every real crest twice,
+# because a genuine Sydney ridge tied to a street in the valley is a violation
+# too and the downward answer is to cut the ridge. The average is *right* on a
+# sandstone headland, where nobody knows which side the error is on. So the
+# operator is one-sided **per post**, and the thing that decides is not a
+# classification but the measurement the passes before it already made:
+#
+#     lambda = 0.5 + 0.5 * confidence          confidence in [0, 1]
+#     h      = relax_down( lambda * low + (1 - lambda) * high )
+#
+# with `confidence = 0` giving back the old average exactly and `confidence = 1`
+# giving the downward answer at that post. **The final downward relax is what
+# does the work and it is the whole trick.** A mixture taken post by post is not
+# feasible -- a node that took `low` beside one that took `high` can be further
+# apart than the budget allows -- so it is projected once more, downward, onto
+# the constraint set. That projection can only lower, so a post whose height is
+# already known pulls its neighbours **down along the grade limit** instead of
+# being pulled up to meet them, which is the sentence this whole block exists to
+# make true. It also means the confidence only has to be right at the post that
+# knows something: the contaminated neighbour needs no opinion of its own, it is
+# brought down by feasibility.
+#
+# Two properties fall out and both are asserted by `roadgrade-sign-check.py`:
+#
+#   * `low <= new <= old`, post by post. The one-sided answer is sandwiched
+#     between the fully downward projection and the average this replaces, so
+#     **nothing anywhere in the city is ever raised by this change** and the
+#     worst case is the global switch the evidence declined to take.
+#   * with no evidence anywhere the result is the old average **bit for bit**,
+#     by an early return rather than by an argument about floating point. That
+#     is `Terrain.load(one_sided=False)`, and it is a named flag in
+#     `terraincache`'s key rather than a monkeypatch, for the reason
+#     RAIL-VERTICAL.md section 3c gives about the other five.
+#
+# **What it buys, on the 5.3 km ring**, every pass on, against the symmetric
+# projection this replaces. `roadgrade-sign-check.py` prints all of it:
+#
+#     the Quay promenade (E140 N820)   26.42 -> 15.18 m AHD   (~2.5 in life)
+#     Circular Quay's station node     30.56 -> 20.36
+#     median kept / written             0.41 -> 1.13
+#     posts the road pass raised            0, largest rise 0.000000 m
+#     profile grade p95 / max          7.97% -> 8.63% / 15.000% -> 15.000%
+#     `road-grade-audit` over 15%      0.026% -> 0.017% of carriageway segments
+#     the Kings Cross escarpment's relief  40.14 -> 40.07 m
+#     five inland controls, 0.9 to 3.2 km from water    +0.0000 every one
+#     past 1 km from tidal water       61 posts moved, the deepest by 0.054 m
+#
+# The last three lines are the ones that say this is not a global switch wearing
+# a per-post disguise. The `road-grade-audit` line is the gate section 3d named
+# and it comes out *better*, which it should: a street that has been allowed to
+# fall to its own shore is a street the lattice has less trouble holding.
+#
+# --- What counts as evidence, and how much ------------------------------------
+#
+# Three things are known before the solve reads its first profile, and the two
+# that survived are the two that are measurements rather than labels.
+#
+# **(1) Metres an earlier pass already took off this post.** `Terrain.load`
+# snapshots the lattice before `bareearth` and diffs it after `shoreline`, so
+# this is every early pass's write at once and a sixth pass would join it for
+# free. It is the strongest signal there is: a post the shore rule pulled down
+# eleven metres is a post whose height came from a *rule* and not from the DSM,
+# and handing half of it back to a tie chain is the defect this block is about.
+#
+# **(2) The deconvolution's own `built_drop`**, which is `bareearth`'s estimator
+# -- *how much building is the DSM looking at here*, per post, continuous,
+# metres. `shoreline.conform` rasterises it over its band and reports it here
+# rather than anyone computing it twice; where nobody has rasterised it, it is
+# zero and says nothing. It earns its place over (1) at the posts where the shore
+# rule agreed the ground was built on and then found nothing to correct, which
+# are trusted-low and carry a zero write.
+#
+# **(3) Water adjacency, which is *not* independent evidence and does not get a
+# term.** The tempting rule -- a post at the waterline is low, because the sea is
+# at zero -- is false in this extent: North Head, the Gap and Dover Heights are
+# eighty-metre cliffs standing at a mapped tidal waterline, and `shoreline.py`'s
+# built-mass floor exists precisely because a pull toward the water flattens real
+# rock. So the shore weight enters as a **shape on (2)** and not as a term of its
+# own: near the water, where the correction a shore rule is allowed to make is
+# largest, the built mass is believed most, and the belief goes to zero at the
+# same reach the shore rule's own weight does. That is what keeps this operator
+# from putting a step at 250 m that `shoreline.py` went to some trouble not to.
+#
+# The two constants are the metres at which each measurement is believed
+# completely. Both are ramps from zero rather than thresholds, for rule 1 of
+# RAIL-VERTICAL.md: a threshold is a classification wearing a number.
+#
+# **And the first thing the sweep says is that neither of them is a tuning
+# knob.** Every row below is a full 5.3 km solve; the columns are the Quay
+# transect (`shoreline-check.py`'s three named stations), the Kings Cross ridge
+# over Woolloomooloo -- which is `TIE_RADIUS_M`'s own watch-point, and the
+# `relief` between them is the landform a downward projection would flatten --
+# Town Hall, and how many of the 137,780 solved nodes the one-sidedness lowered.
+# Nothing in the sweep put a single edge over `MAX_GRADE`.
+#
+#  corrected  built |  N860   N820   N780 | ridge valley relief | Town Hall | lowered
+#        off    off | 12.16  26.42  28.27 | 46.91   6.77  40.14 |     69.62 |       0
+#        4.0     12 |  7.09  15.18  16.65 | 46.20   5.64  40.56 |     68.48 |  15,186
+#        2.0     12 |  7.09  15.18  16.65 | 45.93   5.11  40.83 |     68.48 |  16,377
+#  >     1.5     12 |  7.09  15.18  16.65 | 45.16   5.10  40.07 |     68.48 |  17,004
+#        1.0     12 |  7.09  15.18  16.65 | 45.15   5.10  40.05 |     68.48 |  17,465
+#        0.5     12 |  7.09  15.18  16.65 | 45.11   5.10  40.01 |     68.48 |  17,898
+#        1.5    off |  7.09  15.18  16.65 | 45.16   5.10  40.07 |     68.48 |  16,994
+#        off     12 |  8.32  17.74  19.29 | 46.91   6.48  40.42 |     69.62 |  13,352
+#
+# **The Quay column does not move at all across a factor of eight**, and neither
+# does Town Hall, and the escarpment's relief stays inside 0.8 m of where it
+# started on every row including the ones this operator is not on. What decides
+# the answer is that a post has *some* confidence, not how fast the confidence
+# saturates -- which is what you would expect of an operator whose work is done
+# by a downward relax that either binds or does not. So these two numbers are
+# chosen to mean something rather than to buy something, and if that ever stops
+# being true this table is where it will show.
+#
+# `SIGN_CORRECTED_M` is **1.5 m**: the metres of correction at which an earlier
+# pass's write stops being the tail of its own feather. The shore pass's write is
+# p50 0.30 and p95 4.31 m over this ring, so 1.5 puts the median post it touched
+# at 20% -- believed a little -- and everything past about p80 at full. The rows
+# either side of it are the two things a wrong answer would look like and neither
+# happens: at 0.5 the extra 900 nodes buy 0.05 m of anything, and at 4.0 the
+# 1,800 nodes given up buy 0.5 m of ridge that the relief column says was never
+# in danger.
+#
+# `SIGN_BUILT_M` is **12.0 m**, and it is `bareearth.py`'s calibration row read
+# as a confidence rather than as a correction: Town Hall's built mass is 16.17 m
+# and Chatswood's 12.73, both places the DSM is unarguably reading a roof, and
+# Centennial Park's is **1.21 m** -- the negative control, which that module's
+# header calls "the neighbouring streets bleeding in through the Gaussian's own
+# tail". At 12 m the control lands at confidence 0.10, a five per cent shift
+# toward the downward answer on ground with no building on it, and section 5 of
+# the check measures what that is worth at Centennial Park: **zero to the
+# millimetre**, because the park is 971 m from mapped water and no chain of ties
+# at `CROSS_GRADE` over `TIE_RADIUS_M` reaches it from anything that moved.
+#
+# **The built term is doing almost nothing today and that is stated rather than
+# hidden.** The `1.5 / off` row is the whole operator with it switched off and it
+# is identical to `1.5 / 12` in every column, 16,994 nodes against 17,004 -- ten.
+# It is subsumed, not redundant, and the two rows that show the difference are
+# `off / 12`, where the built mass on its own is a working signal that takes the
+# Quay from 26.42 to 17.74 and lowers 13,352 nodes with no help from anyone's
+# write; and the day the city-wide deconvolution `terrain.py` has been asking for
+# since it was written finally lands, when `built` will be the only one of the
+# two that is nonzero in the middle of the CBD. Varying it 6 / 12 / 24 changes
+# nothing at all while `corrected` is on, which is the same sentence again.
+SIGN_CORRECTED_M = 1.5
+SIGN_BUILT_M = 12.0
+
+
+class GroundEvidence:
+    """How well the ground under each lattice post is already known, 0 to 1.
+
+    One float32 array on the lattice's own grid, accumulated by `Terrain.load`
+    and the passes that run before the solve, read once per station by `solve`
+    and dropped. It is deliberately **not** kept on `Terrain`: it is an input to
+    one solve and not a property of the ground, and `terraincache` pickles that
+    object.
+
+    Each contributor calls one method and the array takes the **maximum**,
+    because the three views are three views of one fact and evidence at one of
+    them is evidence. Nothing here subtracts confidence: a pass that knows
+    nothing about a post writes nothing to it.
+    """
+
+    def __init__(self, shape: tuple[int, int], p0: int, q0: int, spacing: float) -> None:
+        self.w = np.zeros(shape, dtype=np.float32)
+        self.p0 = p0
+        self.q0 = q0
+        self.spacing = spacing
+
+    def corrected(self, metres: np.ndarray) -> None:
+        """Metres an earlier pass already took off each post. See (1) above."""
+        term = np.clip(np.asarray(metres, dtype=np.float32) / np.float32(SIGN_CORRECTED_M), 0.0, 1.0)
+        np.maximum(self.w, term.reshape(self.w.shape), out=self.w)
+
+    def built(self, where: np.ndarray, metres: np.ndarray, shore_weight: np.ndarray) -> None:
+        """`bareearth`'s deconvolution at a subset of posts. See (2) and (3).
+
+        `where` is a flat boolean mask over the lattice and the two arrays are
+        that mask's population, in its order -- which is the shape
+        `shoreline.conform` already has its band in, so nothing is re-derived to
+        report it.
+        """
+        term = np.asarray(shore_weight, dtype=np.float64) * np.clip(
+            np.asarray(metres, dtype=np.float64) / SIGN_BUILT_M, 0.0, 1.0
+        )
+        flat = self.w.reshape(-1)
+        idx = np.flatnonzero(np.asarray(where).reshape(-1))
+        flat[idx] = np.maximum(flat[idx], term.astype(np.float32))
+
+    def at(self, east, north) -> np.ndarray:
+        """The confidence at arbitrary ENU points, bilinear off the post grid.
+
+        The same interpolation `Terrain.sample` uses, for the obvious reason: a
+        station reads its confidence from the same four posts it reads its
+        ground from, so the two cannot disagree about which cell it is in.
+        """
+        from .terrain import _bilinear
+
+        x = np.asarray(east, dtype=np.float64) / self.spacing - self.p0
+        y = np.asarray(north, dtype=np.float64) / self.spacing - self.q0
+        return np.clip(np.asarray(_bilinear(self.w, x, y), dtype=np.float64), 0.0, 1.0)
+
+    @property
+    def any(self) -> bool:
+        return bool((self.w > 0.0).any())
 
 # --- The conformance ----------------------------------------------------------
 
@@ -402,12 +638,21 @@ def _segment_distance_height(px, py, a, b, ha, hb):
 # --- Half one: the profile solve ----------------------------------------------
 
 
-def solve(sample, radius_m: float, roads: list[osm.OsmRoad] | None = None) -> RoadSurface:
+def solve(
+    sample,
+    radius_m: float,
+    roads: list[osm.OsmRoad] | None = None,
+    evidence: GroundEvidence | None = None,
+) -> RoadSurface:
     """Solve one elevation profile for every street in the extent.
 
     `sample(east, north)` is the natural ground -- `Terrain.sample` against the
     unconformed lattice. Passed in rather than imported so this module never
     depends on the thing that is about to consume it.
+
+    `evidence` is what the passes that ran before this one know about the sign
+    of the DSM's error, post by post; `None` restores the symmetric projection
+    exactly. See the `--- The sign of the error ---` block.
     """
     if roads is None:
         roads = osm.read_roads(radius_m)
@@ -433,13 +678,27 @@ def solve(sample, radius_m: float, roads: list[osm.OsmRoad] | None = None) -> Ro
     # street, and a street's neighbour has nothing to say about it. The clamp
     # runs on the road graph plus the plan ties, because that one is a statement
     # about the ground and the ground is shared. See `TIE_RADIUS_M`.
+    # One confidence per node, the strongest of its arms': a junction where one
+    # street runs down to a corrected shore and the other comes off the
+    # contaminated plateau is a junction that knows something, and the arm that
+    # knows it is the one to believe. Zero everywhere when no pass ran before
+    # this one, which is the `None` that gives the old operator back.
+    station_conf = (
+        np.zeros(len(pts)) if evidence is None else evidence.at(pts[:, 0], pts[:, 1])
+    )
+    node_conf = np.zeros(n_nodes)
+    np.maximum.at(node_conf, node_of, station_conf)
+
     h = _smooth(obs, edges, edge_len)
     ties, tie_len = _ties(pts, way_of, node_of, n_nodes)
     both = np.vstack((edges, ties))
     soft_limit = np.concatenate((TARGET_GRADE * edge_len, CROSS_GRADE * tie_len))
     hard_limit = np.concatenate((MAX_GRADE * edge_len, CROSS_GRADE * tie_len))
-    h = h + SOFT_PULL * (_lipschitz(h, both, soft_limit) - h)
-    h = _lipschitz(h, both, hard_limit)
+    # The soft pull is one-sided too, and has to be: it is a partial step toward
+    # the 10% set and a step that splits the error evenly is exactly the thing
+    # the hard projection below would then have to undo.
+    h = h + SOFT_PULL * (_lipschitz(h, both, soft_limit, node_conf) - h)
+    h_sym, h = _projections(h, both, hard_limit, node_conf)
 
     station_h = h[node_of]
     surface = _segments(ways, corridors, pts, way_of, station_h)
@@ -460,6 +719,16 @@ def solve(sample, radius_m: float, roads: list[osm.OsmRoad] | None = None) -> Ro
         # would mean the estimator had lost the city.
         drop_p50=float(np.percentile(natural - station_h, 50)),
         drop_p95=float(np.percentile(natural - station_h, 95)),
+        # What the one-sidedness was worth, node by node, against the symmetric
+        # answer this replaces. Never negative -- `_projections` guarantees
+        # `out <= sym` -- so a positive maximum here is the whole of the change
+        # and a zero one means the evidence never reached a node that mattered.
+        # `0 lowered` is `A zero counter means untested`, not a clean bill.
+        sign_nodes=int((node_conf > 0.0).sum()),
+        sign_trusted=int((node_conf >= 0.5).sum()),
+        sign_lowered=int((h_sym - h > 1e-9).sum()),
+        sign_p95=float(np.percentile(h_sym - h, 95)),
+        sign_max=float((h_sym - h).max()),
     )
     return surface
 
@@ -721,17 +990,39 @@ def _ties(pts: np.ndarray, way_of: np.ndarray, node_of: np.ndarray, n_nodes: int
     return np.column_stack((lo[first], hi[first])), np.maximum(d[first], 1.0)
 
 
-def _lipschitz(h: np.ndarray, edges: np.ndarray, limit: np.ndarray) -> np.ndarray:
-    """The nearest profile that respects every edge's height budget.
+def _projections(
+    h: np.ndarray, edges: np.ndarray, limit: np.ndarray, prefer_low: np.ndarray | None
+) -> tuple[np.ndarray, np.ndarray]:
+    """(the symmetric answer, the one-sided one) for one budget.
 
-    Two one-sided projections and their average. `low` relaxes
-    `h_i <- min(h_i, h_j + limit)` to a fixpoint, which is the largest function
-    obeying every budget that lies *below* h; `high` does the mirror image and is
-    the smallest one above. Both obey the budgets, so their average does too --
-    the constraint set is convex -- and averaging is what keeps a clamped crest
-    from being shaved twice: cutting a spike down (low) and filling the valleys
-    either side of it up (high) are both legal answers and the truth is between
-    them.
+    `low` relaxes `h_i <- min(h_i, h_j + limit)` to a fixpoint, which is the
+    largest function obeying every budget that lies *below* h; `high` does the
+    mirror image and is the smallest one above. Both obey the budgets, so their
+    average does too -- the constraint set is convex -- and averaging is what
+    keeps a clamped crest from being shaved twice: cutting a spike down (low)
+    and filling the valleys either side of it up (high) are both legal answers
+    **when the truth is between them.**
+
+    `prefer_low` is a per-node confidence in [0, 1] that it is not: that the
+    error at this node is known to be upward, or that its height was written by
+    a rule rather than read off a surface model. It slides the mixture from the
+    average toward `low`, and the mixture is then projected down once more,
+    because a mixture taken node by node is not itself feasible. The **`--- The
+    sign of the error ---` block above is the argument** and it is not repeated
+    here; what belongs here is the arithmetic:
+
+        lambda = 0.5 + 0.5 * confidence
+        out    = relax( lambda * low + (1 - lambda) * high , down )
+
+    With no confidence anywhere the mixture *is* the average, which is already
+    feasible, so the extra relax would be a no-op -- and it is skipped rather
+    than trusted to be one, so the old behaviour is returned bit for bit and the
+    check can assert that instead of arguing about ulps.
+
+    `low <= out <= sym`, node by node: `out` is a relax of something that is
+    pointwise >= `low`, and `relax` is monotone with `low` feasible, so it can
+    never fall below it; and the mixture is pointwise <= the average, which a
+    downward relax only reduces further.
 
     The fixpoint does not depend on the order the edges are relaxed in, so
     neither does the result.
@@ -748,7 +1039,23 @@ def _lipschitz(h: np.ndarray, edges: np.ndarray, limit: np.ndarray) -> np.ndarra
                 break
         return sign * out
 
-    return 0.5 * (relax(h, 1.0) + relax(h, -1.0))
+    low = relax(h, 1.0)
+    high = relax(h, -1.0)
+    sym = 0.5 * (low + high)
+    if prefer_low is None or not (prefer_low > 0.0).any():
+        return sym, sym
+    lam = 0.5 + 0.5 * np.clip(prefer_low, 0.0, 1.0)
+    return sym, relax(lam * low + (1.0 - lam) * high, 1.0)
+
+
+def _lipschitz(
+    h: np.ndarray,
+    edges: np.ndarray,
+    limit: np.ndarray,
+    prefer_low: np.ndarray | None = None,
+) -> np.ndarray:
+    """The nearest profile that respects every edge's height budget."""
+    return _projections(h, edges, limit, prefer_low)[1]
 
 
 def _segments(ways, corridors, pts, way_of, station_h) -> RoadSurface:
