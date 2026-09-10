@@ -3627,8 +3627,19 @@ def cmd_road_grade_audit(args: argparse.Namespace) -> int:
         # the surface before the pipeline told the ground anything, and a lattice
         # with a landmark's footprint levelled into it but no road conformance is
         # another surface that never existed at any point in the build.
+        # **Every flag is named, and that is the whole of the lesson in
+        # RAIL-VERTICAL.md section 3c.** `Terrain.load` grew a fourth flag
+        # (`bare_earth`) and then a fifth (`shoreline`), both defaulting on, and
+        # a call that named only three read a hybrid nobody chose -- the raw
+        # drape with two later passes' corrections still in it -- for five days.
+        # A `raw` column means every pass off; anything else means every pass on.
         field = Terrain.load(
-            radius, conform_roads=conform, conform_water=conform, conform_pads=conform
+            radius,
+            conform_roads=conform,
+            conform_water=conform,
+            conform_pads=conform,
+            bare_earth=conform,
+            shoreline=conform,
         )
         label = "a fresh lattice, " + (
             "roads conformed" if conform else "roads NOT conformed (the before)"
