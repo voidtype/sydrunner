@@ -533,7 +533,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     # `driving.NOSE_STEP` climbs, the creek stand against the reach length -- and
     # a retile is hours, so the moment to find out that one of them moved is now
     # rather than at the end. They cost milliseconds and touch no data.
-    gate = decks.verify_decks() + creeks.verify_creeks() + footbands.verify_footbands()
+    gate = (
+        decks.verify_decks()
+        + creeks.verify_creeks()
+        + footbands.verify_footbands()
+        + elevated.verify_elevated()
+    )
     for failure in gate:
         print(f"  SELF-CHECK   {failure}")
     if gate:
@@ -648,6 +653,32 @@ def cmd_build(args: argparse.Namespace) -> int:
         stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones), roads
     )
     _report_decks(deck_network)
+
+    # And the other half of the same seam: a footprint that stands up into one
+    # of those decks. It has to be here and it cannot be inside `elevated.resolve`
+    # -- the deck profile does not exist until the line above has run. A height
+    # is not a plan quantity, so the bucketing done above and every keep-out
+    # derived from a footprint stay exactly what they were; everything that reads
+    # a height after this point reads the capped one. See `elevated.py`'s header.
+    print("  capping the buildings under a deck ...")
+    cap_report = elevated.cap_under_decks(
+        buildings,
+        deck_network,
+        terrain,
+        [p for ps in (landmark_prisms or {}).values() for p in ps],
+    )
+    _report_cap(cap_report)
+    # A dropped polygon has to leave the tile buckets too. `cap_under_decks`
+    # filters the list it was handed; `by_tile` was built from the same objects
+    # a hundred lines up and holds its own references, so it is filtered here
+    # rather than rebuilt -- rebuilding it would re-derive `Building.tile` from
+    # centroids nothing has moved.
+    if cap_report.dropped:
+        gone = {bid for bid, _ in cap_report.dropped}
+        for key, bucket in list(by_tile.items()):
+            kept = [b for b in bucket if b.id not in gone]
+            if len(kept) != len(bucket):
+                by_tile[key] = kept
 
     progress.step(0.85, "reading parks and mapped trees")
     print("  reading parks and mapped trees ...")
@@ -1092,6 +1123,58 @@ def _report_elevated(r: elevated.ElevatedReport) -> None:
             print(f"      ... and {len(rows_) - 12} more")
 
 
+def _report_cap(r: elevated.CapReport) -> None:
+    """What came off the roofs under the decks, and what would not come off.
+
+    `_report_elevated`'s terms: named, capped at twelve, because a capped
+    building is a visible change of shape and a rule change that suddenly capped
+    two hundred of them would otherwise print one tidy line. The `refused` list
+    is the more interesting of the two -- every entry is a deck lying *on* the
+    ground through a building, which is a different defect with a different owner
+    (`elevated._decide`'s cut ladder), and this is the only place it is counted.
+    """
+    if not r.prisms:
+        print("    no deck solids in this extent; nothing to cap under")
+        return
+    removed = r.removed_m
+    print(
+        f"    {r.prisms:,} deck solids over {r.under_deck:,} footprints"
+        f" ({r.candidates:,} box-test pairs);"
+        f" {len(r.capped):,} capped at the soffit less {elevated.DECK_HEADROOM_M:.1f} m"
+        + (
+            f", p50 {np.percentile(removed, 50):.2f} m off,"
+            f" max {max(removed):.2f} m"
+            if removed
+            else ""
+        )
+    )
+    for bid, was, now in sorted(r.capped, key=lambda c: c[2] - c[1])[:12]:
+        print(f"      {bid}  {was:.2f} m -> {now:.2f} m")
+    if len(r.capped) > 12:
+        print(f"      ... and {len(r.capped) - 12} more")
+    if r.dropped:
+        print(
+            f"    {len(r.dropped):,} dropped: under"
+            f" {100 * elevated.VIADUCT_PLAN_SHARE:.0f}% of the plan survives the deck"
+            f" corridor, so the polygon is the viaduct rather than a building under one"
+        )
+        for bid, why in r.dropped[:12]:
+            print(f"      {bid}  {why}")
+        if len(r.dropped) > 12:
+            print(f"      ... and {len(r.dropped) - 12} more")
+    if r.refused:
+        print(
+            f"    {len(r.refused):,} refused: one storey would not fit under the"
+            f" soffit and the polygon is not the viaduct, so the deck is on the"
+            f" ground through a real building -- `elevated._decide`'s cut ladder,"
+            f" not this rule"
+        )
+        for bid, why in r.refused[:12]:
+            print(f"      {bid}  {why}")
+        if len(r.refused) > 12:
+            print(f"      ... and {len(r.refused) - 12} more")
+
+
 def _report_suppression(anchors: dict, removed: dict[str, list[str]]) -> None:
     """What the landmark zones took out of the generic city, by id.
 
@@ -1207,6 +1290,19 @@ def _report_decks(net: decks.DeckNetwork) -> None:
         f" {s['pinned']:,} pinned to a ground touchdown"
         f" ({s['unpinned_components']} components reached none)"
     )
+    # The station-zone rule, `decks._station_zone_ground`. Printed even at zero,
+    # because zero is the interesting number: it means either that no deck
+    # crosses a bridge-tagged station in this extent or that the bare-earth pass
+    # took nothing off the ground under one, and those are different worlds. See
+    # `decks.py`'s header, third bug, and RAIL-VERTICAL.md section 3b.
+    if s.get("station_zone_nodes"):
+        print(
+            f"    {s['station_zone_nodes']:,} deck nodes stand inside a bridge-station"
+            f" zone; {s['station_zone_lifted']:,} were solved from the ground their"
+            f" approaches see instead"
+            f" (p50 {s.get('station_zone_lift_p50_m', 0.0):.2f} m,"
+            f" max {s.get('station_zone_lift_max_m', 0.0):.2f} m)"
+        )
     # The fifth line, and it is the one that says whether the world is walkable
     # under its own motorways. `decks._crossing_demand` is the rule and
     # `server/overpass-clearance-check.ts` is the gate on the shipped bytes;

@@ -120,6 +120,131 @@ with a girder, parapets and piers. Nothing here changes that, and the overlap is
 deliberate in one direction only: where an ML blob has duplicated a deck
 `decks.py` already builds, dropping the blob removes a duplicate rather than a
 structure.
+
+---------------------------------------------------------------------------
+**THE OTHER HALF OF THE SAME SENTENCE: A BUILDING UNDER A DECK IS NO TALLER THAN
+THE DECK'S SOFFIT.**
+
+`server/clash-check.ts`' note on `BUDGET_DECK_IN_BUILDING` had been saying this
+for two rounds and nobody had read it as a brief:
+
+  > *`elevated.ROAD_CLEARANCE_M` lifts a **building** over a road; nothing lifts
+  > a road over a building, and `decks._crossing_demand` reads carriageways
+  > only.*
+
+That is one rule missing and it is this one. The pipeline has, all along, had
+exactly one relationship between a road and a structure over it -- the 5.4 m a
+footprint is raised to clear a carriageway -- and no relationship at all in the
+other direction. So 540 pairs of deck-inside-building stood in the shipped world
+before the round that broke Milsons Point ever ran: 362 m2 of the Cahill's
+Upper Pitt Street ramp inside one footprint, Fitzroy Street, James Craig Road,
+Jeffreys Street. Every one of them is the same picture -- a roof drawn through a
+viaduct's girder, or a viaduct's girder drawn through a roof, which is the same
+picture seen from underneath.
+
+**Why the building comes down rather than the deck going up.** The deck is
+solved: its height is its two touchdowns, the roads it must clear and a 7%
+ceiling, and every one of those is a measurement of something real. A roof
+height is not. 71% of this world's footprints have their height *inferred* --
+`attributes.resolve_height`'s last two rungs, an ML estimate or a guess from
+area and context -- and an inferred roof that reaches into a solved viaduct is
+the least-evidenced number in the pair. It is also the only one that can be
+changed without moving anything else: `decks.py`'s profile is a graph solve
+whose every node is coupled to its neighbours, and a roof is a single float.
+
+The rule:
+
+  **Where a building's footprint lies under a deck's solid, its extrusion is
+  capped at that solid's underside less `DECK_HEADROOM_M`, and never below its
+  own base plus one storey.**
+
+`cap_under_decks` is the rule. Four things about it are decisions:
+
+**`DECK_HEADROOM_M` is `decks.WALK_UNDER_M`, 2.6 m,** and it is borrowed rather
+than invented because it is the same question asked from the other side.
+`decks.py` sets 2.6 m as the clearance at which a deck's collision prism lifts
+off the ground and the player walks *under* it rather than onto it, and
+`CollisionWorld.roofHeight` stands a player on any prism top they are above --
+so a roof under a viaduct is a floor the player can be standing on, and a
+headroom under 2.6 m is a place they cannot stand up. Anything smaller would be
+a number chosen to make a count go down; this one is the number the rest of the
+build already means by "there is room under this".
+
+**The floor is a refusal, not a squashing.** Where the soffit less the headroom
+would put the roof under its own base plus one storey, the cap is *not applied*.
+Squashing it to a single storey would obey the letter of "never below its own
+base plus one storey" and be a worse world: those are the places where a deck
+prism is in `decks.prisms`' embankment form -- a touchdown ramp whose base is
+`ground - 0.5` because there is no room to walk under it -- and a ramp lying on
+the ground through a building is not a headroom problem. Flattening a terrace
+row along every touchdown in Sydney to make a clash counter fall would be the
+wrong trade twice over. It is also arithmetically useless, and that is the
+argument that settles it: squashing the Milsons Point case to one storey leaves
+its roof at -30.5 m over a deck whose solid tops out at -35.4, so the band still
+overlaps and the pair still counts. A cap that cannot clear the band is a
+building shortened for nothing.
+
+**Where the deck is through the footprint rather than over it, the last question
+is `_decide`'s own, and so is the answer.** The refusal above leaves the pair
+standing, and at Milsons Point the pair is 98 of them against **one** OSM
+polygon: `o1069460235`, `building=yes`, `levels=2`, 3,467 m2, whose plan is a
+182 m x 20 m strip running (240, 2562) - (220, 2632) - (200, 2688) - (186, 2736).
+That is not a building beside the Bradfield Highway approach. It **is** the
+Bradfield Highway approach, mapped as a building, and `decks.py` has solved a
+deck straight down the middle of it. So the polygon is put to the question this
+module already asks of an ML blob that swallowed a footbridge -- *cut the road
+out and see what is left* -- with the solved deck ribbon standing in for the
+buffered centreline, and if under `VIADUCT_PLAN_SHARE` of its plan survives, it
+is dropped.
+
+Three things keep that deletion inside the fence `_decide` already built.
+**A drop still needs OSM to have mapped a bridge**: a deck solid exists here only
+because `decks._is_deck` read `bridge` on the way, so the corroboration is the
+same evidence, arrived at through a solve rather than a buffer. **It is only ever
+asked after the cap has been refused**, so a footprint the deck genuinely passes
+over is capped and never considered for deletion. **The proof is stricter than
+`_decide`'s**, a fifth of the plan against a half, because `_decide` can cut and
+this rung cannot -- `VIADUCT_PLAN_SHARE` argues that at length. And **every drop
+is named in the report**, on `ElevatedReport.dropped`'s terms.
+
+**What the two rules are worth, measured**, on a scoped emit of the four
+Milsons Point tiles overlaid on the round-two world,
+`clash-check --near 185,-2719 --radius 450`:
+
+| | world | with both rules |
+|---|---|---|
+| `DECK_IN_BUILDING` | **145** pairs, 6,401 m2 | **10** pairs, 199 m2 |
+| every other one of the twelve rows | | unchanged |
+| the four tiles' `.terr.bin` | | byte-identical |
+
+Over the whole 60 km the pass's own census is **75,956 deck solids over 90
+footprints**: 13 capped (p50 5.00 m off a roof, max 10.30 m), 8 dropped, 49
+refused because the deck is on the ground through a real building, and 20
+already clear. The ten pairs left in the window are all refusals, 2 to 51 m2
+each, and every one of them is `_decide`'s cut ladder's work rather than this
+rule's.
+
+The one cost, stated rather than hoped away: this runs after
+`streets.StreetNetwork.load` has already subtracted the footprint from the paved
+footpath band, so a dropped viaduct-polygon leaves its own plan unpaved
+underneath the deck that replaces it. Under a viaduct that reads as the
+un-paved strip a viaduct corridor is; moving the drop earlier would mean solving
+the decks before the streets, which is a reordering with its own argument to
+make and not this rule's to make for it.
+
+**The overlap threshold is half the check's.** `clash-check.MIN_OVERLAP_M2` is
+2.0 m2 and this fires at 1.0, because the check measures the *quantised*
+collision rings and this measures the source rings, and a rule that fired at
+exactly the threshold it is trying to clear would leave pairs standing on
+5 mm of rounding.
+
+**It runs after the deck solve and mutates in place**, which is the only place
+it can: the deck profile does not exist until `decks.DeckNetwork.load` has run,
+and `cli.cmd_build` has by then bucketed the same `Building` objects by tile. A
+height is not a plan quantity, so nothing already derived -- the tile a building
+belongs to, the footpath its footprint was subtracted from, the bays and poles
+that dodged it -- can move; and everything that reads a height afterwards, the
+tile mesh, the collision prism and `far.bin`, reads the capped one.
 """
 
 from __future__ import annotations
@@ -210,6 +335,58 @@ MIN_REMNANT_M2 = msbuildings.MIN_AREA_M2
 # converted them at different rates would put a building's floor and its roof on
 # two different scales.
 LEVEL_HEIGHT_M = 3.2
+
+
+# --- What a building may not stand up into --------------------------------------
+
+# The air left between a deck's underside and the roof under it, metres.
+#
+# `decks.WALK_UNDER_M`, borrowed rather than invented -- see the header. It is
+# the clearance at which `decks.prisms` lifts a deck's collision base off the
+# ground so the player walks under it, and `CollisionWorld.roofHeight` stands a
+# player on any prism top they are above, so a roof under a viaduct is a floor
+# somebody can be standing on. Below 2.6 m they cannot stand up on it.
+DECK_HEADROOM_M = decks.WALK_UNDER_M
+
+# How much of a footprint has to lie under a deck solid before the cap fires,
+# square metres.
+#
+# Half `clash-check.MIN_OVERLAP_M2`. That check reads the quantised collision
+# rings and this reads the source rings, so a rule that fired at exactly the
+# threshold it exists to clear would leave pairs standing on 5 mm of rounding.
+DECK_OVERLAP_M2 = 1.0
+
+# The prism kinds that are a road over something. `landmarks.Prism.kind` is the
+# vocabulary; a pylon, a podium, a shell and a ferris wheel are not decks, and
+# the buildings that stood under those were removed by `landmarks.suppress`
+# long before this runs.
+DECK_KINDS = frozenset({"deck", "parapet"})
+
+# What share of its own plan a footprint must keep, once the deck solids
+# standing in it are cut out, to still be a building rather than the viaduct.
+#
+# **A fifth, where `_decide`'s own answer to the same question is a half**, and
+# the difference is not a taste: `_decide` can *cut*, and this rung cannot. That
+# pass runs before `cli.cmd_build` buckets by tile, so it is free to take the
+# arm off a footprint and leave the building -- `_recut` moves the centroid and
+# `Building.tile` is derived from it. This one runs after the deck solve, which
+# is after the bucketing, so the only two answers available are "leave it" and
+# "delete it". A deletion offered where a cut is the right answer has to be held
+# to a stricter proof.
+#
+# Measured over the 60 km extent at `BRIDGE_PLAN_SHARE`: 16 polygons, and the
+# tail of that list is the argument. `o1479652865` is a 393 m2 interwar
+# apartment keeping 47% and `o1113541346` a 477 m2 federation keeping 45% --
+# real buildings a viaduct clips, whose 185 and 215 m2 remnants are buildings in
+# their own right. At a fifth, 7 remain and every one of them is a polygon the
+# deck ribbon covers four fifths of, including the 3,467 m2 `building=yes`
+# strip at Milsons Point that *is* the Bradfield Highway approach.
+VIADUCT_PLAN_SHARE = 0.2
+
+# Plan cell for the building index the cap runs against, metres. Sized over the
+# largest deck prism -- a station's worth of ribbon at `decks.STATION_M` by a
+# wide carriageway -- so a prism's lookup is a handful of cells.
+CAP_CELL_M = 64.0
 
 
 # --- The report -----------------------------------------------------------------
@@ -480,6 +657,201 @@ def _decide(
     return b
 
 
+# --- The cap: a building under a deck ---------------------------------------------
+
+
+@dataclass
+class CapReport:
+    """What `cap_under_decks` took off, and what it refused to take off.
+
+    Named rather than counted, on `ElevatedReport`'s terms and for its reason: a
+    capped building is a building the player can see has changed shape, and a
+    build whose `capped` list doubles is a build to look at rather than a number
+    to nod at.
+    """
+
+    capped: list[tuple[str, float, float]] = field(default_factory=list)  # id, from, to
+    refused: list[tuple[str, str]] = field(default_factory=list)
+    # Footprints that *are* the viaduct, removed. `ElevatedReport.dropped`'s
+    # terms exactly: a deletion, named, and never a count.
+    dropped: list[tuple[str, str]] = field(default_factory=list)
+    prisms: int = 0
+    candidates: int = 0
+    under_deck: int = 0
+
+    @property
+    def removed_m(self) -> list[float]:
+        return [a - b for _, a, b in self.capped]
+
+
+def cap_under_decks(
+    buildings: list[merge.Building],
+    deck_network,
+    terrain,
+    extra_prisms=(),
+) -> CapReport:
+    """Cap every footprint that stands up into a deck. See the header.
+
+    `extra_prisms` is `landmarks.prisms_by_tile`'s flattened output -- the hero
+    Harbour Bridge's own deck and parapets, which `decks.py` deliberately does
+    not build and which are as much a road over a roof as any viaduct. Filtered
+    to `DECK_KINDS`, so a pylon, a podium or a ferris wheel cannot cap anything;
+    the buildings that stood inside *those* were removed by `landmarks.suppress`
+    before this module ever saw them.
+
+    Mutates `height` in place and returns the report. Nothing else is touched --
+    not the ring, not the centroid, not `base_height` -- so every plan quantity
+    already derived from these objects stays exactly what it was, which is what
+    makes it safe to run after `cli.cmd_build` has bucketed them by tile.
+    """
+    from . import tiles  # local: `tiles` imports `decks`, and this is one caller
+
+    report = CapReport()
+
+    prisms = [
+        p
+        for key in deck_network.tile_keys()
+        for p in deck_network.prisms(key)
+        if p.kind in DECK_KINDS
+    ]
+    prisms += [p for p in extra_prisms if p.kind in DECK_KINDS]
+    report.prisms = len(prisms)
+    if not prisms or not buildings:
+        return report
+
+    # A plan grid over the footprints rather than an STRtree, and the reason is
+    # memory: an STRtree wants a shapely geometry per building and there are
+    # 1.29 M of them, where a grid wants two floats and an integer. The prisms
+    # are 72,000, so the loop runs the cheap way round -- query per prism, not
+    # per building. Only the pairs that survive the box test are ever built as
+    # polygons.
+    grid: dict[tuple[int, int], list[int]] = {}
+    boxes = np.empty((len(buildings), 4))
+    for i, b in enumerate(buildings):
+        r = b.ring
+        x0, x1 = float(r[:, 0].min()), float(r[:, 0].max())
+        z0, z1 = float(r[:, 1].min()), float(r[:, 1].max())
+        boxes[i] = (x0, z0, x1, z1)
+        for cx in range(int(np.floor(x0 / CAP_CELL_M)), int(np.floor(x1 / CAP_CELL_M)) + 1):
+            for cz in range(int(np.floor(z0 / CAP_CELL_M)), int(np.floor(z1 / CAP_CELL_M)) + 1):
+                grid.setdefault((cx, cz), []).append(i)
+
+    # The lowest deck underside over each footprint, and the plan those decks
+    # occupy on it. `inf` is "no deck here", which is all but a few thousand of
+    # them; the corridor is only kept for the ones that have one, because it is
+    # the second question -- *is this polygon the viaduct* -- and nothing that is
+    # comfortably under a deck ever gets asked it.
+    soffit = np.full(len(buildings), np.inf)
+    plans: dict[int, Polygon] = {}
+    corridor: dict[int, list[Polygon]] = {}
+    for p in prisms:
+        r = p.ring
+        px0, px1 = float(r[:, 0].min()), float(r[:, 0].max())
+        pz0, pz1 = float(r[:, 1].min()), float(r[:, 1].max())
+        seen: set[int] = set()
+        for cx in range(int(np.floor(px0 / CAP_CELL_M)), int(np.floor(px1 / CAP_CELL_M)) + 1):
+            for cz in range(int(np.floor(pz0 / CAP_CELL_M)), int(np.floor(pz1 / CAP_CELL_M)) + 1):
+                seen.update(grid.get((cx, cz), ()))
+        if not seen:
+            continue
+        plan = None
+        for i in seen:
+            bx0, bz0, bx1, bz1 = boxes[i]
+            if bx1 < px0 or bx0 > px1 or bz1 < pz0 or bz0 > pz1:
+                continue
+            report.candidates += 1
+            if plan is None:
+                plan = Polygon(r)
+                if not plan.is_valid:
+                    plan = plan.buffer(0)
+            poly = plans.get(i)
+            if poly is None:
+                poly = _plan(buildings[i])
+                if poly is None:
+                    continue
+                plans[i] = poly
+            try:
+                shared = poly.intersection(plan).area
+            except shapely.errors.GEOSException:
+                continue
+            if shared < DECK_OVERLAP_M2:
+                continue
+            soffit[i] = min(soffit[i], p.base)
+            corridor.setdefault(i, []).append(plan)
+
+    under = np.flatnonzero(np.isfinite(soffit))
+    report.under_deck = len(under)
+    for i in under:
+        b = buildings[i]
+        pad, _ = tiles._pad_and_skirt(terrain, b)
+        base = pad + b.base_height
+        cap = float(soffit[i]) - DECK_HEADROOM_M
+        top = base + b.height
+        if top <= cap:
+            continue
+        storey = _storey_height(b)
+        if cap - base >= storey:
+            report.capped.append((b.id, float(b.height), float(cap - base)))
+            b.height = float(cap - base)
+            continue
+        # The floor binds: the deck is not over this footprint, it is *through*
+        # it, and there is no cap that is also a building. `elevated._decide`'s
+        # own last question then applies, with a solved deck standing in for the
+        # bridge way it usually asks about -- see the header.
+        keep = _remnant_share(plans.get(i), corridor.get(i, ()))
+        if keep is not None and keep < VIADUCT_PLAN_SHARE:
+            why = (
+                f"{100 * keep:.0f}% of its plan survives the deck corridor, so the"
+                f" polygon is the viaduct: a {b.height:.1f} m"
+                f" {b.archetype or 'building'} of {b.area:,.0f} m2 with a soffit at"
+                f" {soffit[i]:.2f} m over a base at {base:.2f} m"
+            )
+            report.dropped.append((b.id, why))
+            continue
+        report.refused.append(
+            (b.id, f"soffit {soffit[i]:.2f} m over a base at {base:.2f} m leaves"
+                   f" {cap - base:.2f} m, under one storey of {storey:.2f} m; "
+                   + ("no plan" if keep is None else f"{100 * keep:.0f}% of the plan survives"))
+        )
+    if report.dropped:
+        gone = {bid for bid, _ in report.dropped}
+        buildings[:] = [b for b in buildings if b.id not in gone]
+    return report
+
+
+def _remnant_share(poly: Polygon | None, corridor) -> float | None:
+    """What share of a footprint survives the deck corridor cut out of it.
+
+    `_largest_remnant`'s question asked of a *solved* deck rather than of a road
+    centreline buffered to its own width, which is the better evidence of the
+    two: a deck ribbon is `DeckRun.half_width` either side of the line the
+    profile was actually solved along, and it is the same polygon
+    `clash-check` convicts the footprint against.
+    """
+    if poly is None or not corridor or poly.area <= 0.0:
+        return None
+    try:
+        cut = poly.difference(unary_union(list(corridor)))
+    except shapely.errors.GEOSException:
+        return None
+    return float(cut.area / poly.area)
+
+
+def _storey_height(b: merge.Building) -> float:
+    """One storey of this building, metres.
+
+    `attributes`' own per-archetype floor-to-floor rather than a constant of this
+    module's, for `LEVEL_HEIGHT_M`'s reason a few lines up: a storey is a storey
+    and two files that disagree about how tall one is put a building's floors and
+    its roof on different scales. A building with no archetype -- which nothing
+    that has been through `attributes.apply` has -- falls back to that generic.
+    """
+    from . import attributes
+
+    arch = attributes.ARCHETYPES.get(b.archetype)
+    return arch.floor_height if arch is not None else LEVEL_HEIGHT_M
+
+
 def _lift(b, base: float, bucket: list, why: str) -> bool:
     """Raise a prism to `base`. False when there is no prism left above it.
 
@@ -644,3 +1016,119 @@ def _ground_at(b: merge.Building, terrain) -> float | None:
     """
     h = float(terrain.sample(*b.centroid))
     return h if np.isfinite(h) else None
+
+
+def verify_elevated() -> list[str]:
+    """The cap's six claims, on made-up geometry and made-up ground.
+
+    Six, and two of them are negative controls, because the failure mode of a
+    rule that lowers roofs is not that it misses one -- a missed one is a pair
+    the check still counts and names -- it is that it quietly shortens buildings
+    nowhere near a viaduct. And one of them is a control on the *deletion*, which
+    is the only thing here that cannot be undone by looking at it again: a real
+    building with a deck lying on the ground through a corner of it must come
+    back grounded, its full height, and named as refused.
+
+    Costs microseconds and touches no data. Wired into `cli.cmd_build`'s gate
+    beside `decks.verify_decks`, which is the pipeline's boot list.
+    """
+    failures: list[str] = []
+
+    class _Flat:
+        """Ground at y = 0, and a `densify` that adds nothing to a ring."""
+
+        @staticmethod
+        def sample(e, north=None):
+            if north is None:
+                return 0.0
+            return 0.0 if np.ndim(e) == 0 else np.zeros(np.shape(e))
+
+        @staticmethod
+        def densify(pts):
+            return np.asarray(pts, dtype=np.float64)
+
+    class _Net:
+        def __init__(self, prisms):
+            self._p = prisms
+
+        def tile_keys(self):
+            return {"0_0"}
+
+        def prisms(self, _key):
+            return self._p
+
+    from .landmarks import Prism
+
+    def _rect(cx, cz, hx, hz):
+        return np.array(
+            [[cx - hx, cz - hz], [cx + hx, cz - hz], [cx + hx, cz + hz], [cx - hx, cz + hz]],
+            dtype=np.float64,
+        )
+
+    def _building(bid, cx, cz, hx, hz, height):
+        b = merge.Building(id=bid, source="osm", ring=_rect(cx, cz, hx, hz))
+        b.area = float(4 * hx * hz)
+        b.centroid = (cx, cz)
+        b.height = height
+        b.archetype = "terrace"
+        return b
+
+    under = _building("under", 0.0, 0.0, 5.0, 5.0, 20.0)
+    beside = _building("beside", 400.0, 0.0, 5.0, 5.0, 20.0)
+    clip = _building("clip", 0.0, 100.0, 5.0, 5.0, 20.0)
+    through = _building("through", 0.0, 200.0, 20.0, 20.0, 20.0)
+    viaduct = _building("viaduct", 0.0, 300.0, 30.0, 5.0, 20.0)
+    every = [under, beside, clip, through, viaduct]
+    net = _Net([
+        # Over `under`: a soffit 12 m up.
+        Prism(_rect(0.0, 0.0, 6.0, 6.0), 12.0, 2.0, "deck"),
+        # A sliver over `clip`'s northern edge: 0.4 m2, under `DECK_OVERLAP_M2`.
+        Prism(_rect(0.0, 105.4, 0.5, 0.4), 12.0, 2.0, "deck"),
+        # On the ground through a corner of `through`, whose plan is mostly its own.
+        Prism(_rect(0.0, 200.0, 6.0, 20.0), 1.0, 2.0, "deck"),
+        # And straight down the middle of `viaduct`, which is the deck's own plan.
+        Prism(_rect(0.0, 300.0, 30.0, 6.0), 1.0, 2.0, "deck"),
+    ])
+    r = cap_under_decks(every, net, _Flat)
+
+    want = 12.0 - DECK_HEADROOM_M
+    if abs(under.height - want) > 1e-9:
+        failures.append(
+            f"the deck cap left a roof at {under.height:.3f} m under a 12.0 m"
+            f" soffit; {want:.3f} m was the answer"
+        )
+    if beside.height != 20.0:
+        failures.append(
+            f"the deck cap shortened a building 400 m from any deck to {beside.height:.3f} m"
+        )
+    if clip.height != 20.0:
+        failures.append(
+            f"the deck cap fired on 0.4 m2 of overlap, under its own"
+            f" {DECK_OVERLAP_M2:.1f} m2 floor"
+        )
+    if through.height != 20.0 or [b for b, _ in r.refused] != ["through"]:
+        failures.append(
+            f"a real building with a deck on the ground through a corner of it came"
+            f" back at {through.height:.3f} m and as {[b for b, _ in r.refused]},"
+            " where it should be untouched and refused"
+        )
+    if [b for b, _ in r.dropped] != ["viaduct"] or any(b.id == "viaduct" for b in every):
+        failures.append(
+            f"the polygon whose whole plan is the deck was not dropped:"
+            f" dropped {[b for b, _ in r.dropped]}, survivors {[b.id for b in every]}"
+        )
+    if len(r.capped) != 1:
+        failures.append(f"the deck cap reported {len(r.capped)} caps where one was due")
+
+    # And the two constants, against the things they are borrowed from.
+    if DECK_HEADROOM_M < decks.WALK_UNDER_M:
+        failures.append(
+            f"DECK_HEADROOM_M {DECK_HEADROOM_M} is under decks.WALK_UNDER_M"
+            f" {decks.WALK_UNDER_M}, so a capped roof is a floor with no headroom"
+        )
+    if DECK_OVERLAP_M2 > 2.0:
+        failures.append(
+            f"DECK_OVERLAP_M2 {DECK_OVERLAP_M2} is over clash-check's own"
+            " MIN_OVERLAP_M2 of 2.0, so a pair it convicts can slip under this rule"
+        )
+    return failures
