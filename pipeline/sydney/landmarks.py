@@ -362,6 +362,10 @@ class _AnchorQuery:
     `name` is compared with its runs of whitespace collapsed. OSM has the Luna
     Park big wheel as `Ferris  Wheel`, with two spaces, and a literal that
     reproduced the typo would break the day somebody fixed it.
+
+    **Both selectors are bounded in plan** -- see `ANCHOR_REACH_M`. A `near_m`
+    query has always been, because "nearest" needs a point to be near; the named
+    one was not, and the bug that cost is written up there.
     """
 
     key: str
@@ -426,6 +430,52 @@ _ANCHOR_FALLBACK: dict[str, tuple[float, float]] = {
     "luna_administration": (64.2, 2281.5),
 }
 
+# How far from its recorded point a candidate may sit and still be taken as the
+# feature. Past it the match is refused and the key falls through to the literal
+# outline above, with `source='fallback'` in the build report saying so.
+#
+# ---------------------------------------------------------------------------
+# THIS BOUND IS NOT A TIDY-UP. It is the fix for 190 vertices of Luna Park that
+# shipped sixty-four kilometres outside the city, and the shape of that bug is
+# worth keeping because nothing about it was visible from inside this function.
+#
+# `luna_administration` selects on `name='Administration', building=yes`, with
+# no distance term: among the candidates the largest in plan won. The read is
+# bbox-filtered by the *caller's* radius, and `cli.cmd_build` passes the stage's
+# -- 4,000 m when `pads.py` asks, 60,000 m when the world is baked. At 4 km the
+# only building in the box called Administration is Luna Park's; at 60 km the
+# box is 120 km on a side, it contains a bigger one out past Wollondilly, and
+# that one wins. Everything `build_luna_park` hangs off the anchor -- the hall's
+# painted walls, its string course, cornice and parapet, its glazed bays, its
+# steel hip roof and its collision prism -- was then built at ENU
+# (-28,665, -54,869), and Luna Park lost its Administration building without one
+# number in the manifest changing: the node's anchor is the gate canopy, its
+# translation was right, the audit's placement probe reads the gold finials and
+# they were right too.
+#
+# So the defect was *an answer that depended on the caller's radius*, and both
+# halves of the fix below are aimed at that: the read is clamped to the anchors'
+# own radius so the box is the same box every time, and every candidate must
+# land near the point the key is already recorded at. Either alone would have
+# caught this one; both, because the clamp is an optimisation that a future
+# caller may need to relax and the reach is the invariant.
+#
+# 250 m is chosen against what it has to survive rather than what it has to
+# catch. The eighteen fallbacks above currently sample their OSM centroids to
+# within 0.1 m, and the corrections OSM makes to a mapped building -- a redrawn
+# wall, a split way, a footprint squared up against imagery -- move a centroid
+# metres, not hundreds. Nothing else in Sydney shares one of these names within
+# a quarter kilometre.
+ANCHOR_REACH_M = 250.0
+
+# And the radius the anchors are read at, whatever the caller asks for. Every
+# feature in `_ANCHOR_QUERIES` is inside 2.5 km of Town Hall; `pads.py` already
+# clamps to this number for the cost reason ("a wider read is forty thousand
+# more multipolygons for features that are all inside Circular Quay"), and the
+# clamp belongs here rather than at each call site, because a reader whose
+# answer depends on who asked is the bug above.
+ANCHOR_READ_RADIUS_M = 4000.0
+
 
 def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
     """The OSM features the four landmarks are registered to.
@@ -447,7 +497,7 @@ def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
     """
     from .sources import osm
 
-    bbox = geo.bbox_geodetic_for_radius(radius_m)
+    bbox = geo.bbox_geodetic_for_radius(min(radius_m, ANCHOR_READ_RADIUS_M))
     geoms, attrs = osm._read_layer(osm.PBF_PATH, "multipolygons", bbox)
 
     found: dict[str, Anchor] = {}
@@ -470,13 +520,16 @@ def read_anchors(radius_m: float = 4000.0) -> dict[str, Anchor]:
                 continue
             c = poly.centroid
             here = (float(c.x), float(c.y))
-            if q.near_m is not None:
-                pe, pn = _ANCHOR_FALLBACK[q.key]
-                rank = math.hypot(here[0] - pe, here[1] - pn)
-                if rank > q.near_m:
-                    continue
-            else:
-                rank = -float(poly.area)
+            # Bounded first, ranked second, and for both selectors -- see
+            # `ANCHOR_REACH_M`. A `near_m` query is bounded by its own tighter
+            # number because two city gates thirteen metres apart need it; a
+            # named one by the reach, which is what stops "the largest building
+            # called Administration" reaching Wollondilly.
+            pe, pn = _ANCHOR_FALLBACK[q.key]
+            away = math.hypot(here[0] - pe, here[1] - pn)
+            if away > (q.near_m if q.near_m is not None else ANCHOR_REACH_M):
+                continue
+            rank = away if q.near_m is not None else -float(poly.area)
             if q.key in score and score[q.key] <= rank:
                 continue
             found[q.key] = Anchor(
@@ -2136,16 +2189,28 @@ _WESTFIELD_RING: np.ndarray | None = None
 
 
 def read_podium_ring(radius_m: float = 4000.0) -> np.ndarray | None:
-    """Westfield Sydney's outline, simplified, for the tower podium."""
+    """Westfield Sydney's outline, simplified, for the tower podium.
+
+    Read and bounded on `read_anchors`' terms -- same clamp, same reach, from
+    the tower's own recorded point. This is a first-match-wins select on a name,
+    which is the selector that put Luna Park's Administration building sixty-four
+    kilometres out of town; there is only one Westfield Sydney and it is across
+    the road from the tower, and this is here so that stays a fact about the
+    extract rather than a fact this build relies on.
+    """
     global _WESTFIELD_RING
     from .sources import osm
 
-    bbox = geo.bbox_geodetic_for_radius(radius_m)
+    bbox = geo.bbox_geodetic_for_radius(min(radius_m, ANCHOR_READ_RADIUS_M))
+    te, tn = _ANCHOR_FALLBACK["tower"]
     geoms, attrs = osm._read_layer(osm.PBF_PATH, "multipolygons", bbox)
     for geom, a in zip(geoms, attrs):
         if (a.get("name") or "") != "Westfield Sydney" or not a.get("building"):
             continue
         proj = osm._project(geom)
+        c = proj.centroid
+        if math.hypot(float(c.x) - te, float(c.y) - tn) > ANCHOR_REACH_M:
+            continue
         polys = list(proj.geoms) if proj.geom_type == "MultiPolygon" else [proj]
         poly = max(polys, key=lambda p: p.area)
         simple = poly.simplify(1.5, preserve_topology=True)

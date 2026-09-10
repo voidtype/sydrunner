@@ -4063,6 +4063,13 @@ LANDMARK_TRUTH: dict[str, dict[str, float]] = {
 LANDMARK_PLACEMENT_TOLERANCE_M = 10.0
 # How far a measured height may be from the published one, as a fraction.
 LANDMARK_HEIGHT_TOLERANCE = 0.02
+# And how far any *single vertex* of a landmark may lie from that landmark's
+# anchor, in plan. See section 3: this is not a placement tolerance -- placement
+# is measured to a metre a few lines above it -- it is the fence around a
+# sub-feature built off the wrong anchor, and 1.5 km is set to clear the bridge's
+# approach viaducts (853 m from the deck's centroid, and correct) by a margin
+# nothing built in the right frame can cross.
+LANDMARK_EXTENT_M = 1500.0
 # The largest gap the deck's collision may have along its own axis. A player
 # walks 5.4 m/s and the integrator steps at 60 Hz, so 0.5 m is under six frames
 # of being unsupported -- and in practice the segments abut exactly, so anything
@@ -4393,7 +4400,60 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
             if d > bar:
                 failures.append(f"{name}'s anchor is {d:.1f} m from its OSM feature")
 
-    # --- 3. Heights, against published dimensions.
+    # --- 3. Extent: every vertex against its own anchor, not just the probe band.
+    #
+    # Section 2 asks where the object is and answers with a *band of vertices* --
+    # the arch crown, the podium deck, the two gold finials. That is the right
+    # probe for a placement question and it is blind to the one this section
+    # exists for: a landmark whose anchor, translation and probe band are all
+    # correct and which is *also* drawing a building somewhere else entirely.
+    #
+    # Luna Park shipped exactly that. 190 of its vertices -- painted walls, a
+    # string course, a cornice, a parapet, glazed bays and a steel hip roof, four
+    # primitives' worth -- sat 64 km outside the city at ENU (-28,665, -54,869),
+    # because `luna_administration` selects on a name with no distance term and
+    # at the stage's 60 km read radius a bigger building called Administration
+    # won it (`landmarks.ANCHOR_REACH_M` is the fix and the full write-up). Every
+    # number section 2 prints was correct through all of it, and so was every
+    # number in the manifest: the finials were where they belong, the anchor was
+    # the gate canopy, the placement error was 0.13 m.
+    #
+    # So the test is the whole cloud rather than a probe: no vertex of a landmark
+    # may lie further than `LANDMARK_EXTENT_M` in plan from the anchor the
+    # manifest registers it to. A kilometre and a half is deliberately loose --
+    # the bridge's approach viaducts reach 853 m from the deck's centroid and are
+    # not a defect -- because what this convicts is a sub-feature built in the
+    # wrong frame, and those miss by kilometres or by tens of them, never by two.
+    #
+    # Pure: it reads the shipped positions and the shipped manifest, and nothing
+    # else. No OSM, no terrain, no import of the model that made the file.
+    print("\nextent (every shipped vertex against its own anchor)")
+    for name, node in nodes.items():
+        if name not in items:
+            continue
+        ae, an = items[name]["anchor_enu"]
+        beyond, worst, at = 0, 0.0, None
+        for _mat, pos, _nrm, _tris in node["parts"]:
+            if not len(pos):
+                continue
+            d = np.hypot(pos[:, 0] - ae, -pos[:, 2] - an)
+            over = d > LANDMARK_EXTENT_M
+            beyond += int(over.sum())
+            i = int(d.argmax())
+            if float(d[i]) > worst:
+                worst = float(d[i])
+                at = (float(pos[i, 0]), float(-pos[i, 2]))
+        flag = "" if beyond == 0 else "   <-- OUT"
+        print(f"  {name:16} {beyond:>5} vertices beyond {LANDMARK_EXTENT_M:,.0f} m;"
+              f" worst {worst:9,.1f} m at ({at[0]:10.1f},{at[1]:10.1f}) ENU{flag}")
+        if beyond:
+            failures.append(
+                f"{name} has {beyond:,} vertices up to {worst:,.0f} m from its anchor,"
+                f" over the {LANDMARK_EXTENT_M:,.0f} m bar -- a sub-feature is being"
+                f" built in the wrong frame or off the wrong anchor"
+            )
+
+    # --- 4. Heights, against published dimensions.
     print("\nheights (metres AHD unless noted; published value in brackets)")
 
     def check(label: str, got: float, want: float, unit: str = "m AHD") -> None:
@@ -4426,7 +4486,7 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
         check("luna park entrance towers", _max_y(parts, {"landmark_gold"}) - base,
               LANDMARK_TRUTH["luna_park"]["tower_height"], unit="m AGL")
 
-    # --- 4. The deck, and whether a player can walk it.
+    # --- 5. The deck, and whether a player can walk it.
     print("\nwalkable deck (collision prisms, projected onto the bridge axis)")
     if "harbour_bridge" in items:
         a = items["harbour_bridge"]["audit"]
@@ -4467,7 +4527,7 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
                 f" {2 * len(segs)} deck segments; a player can walk off the side"
             )
 
-    # --- 5. Suppression, end to end.
+    # --- 6. Suppression, end to end.
     print("\nsuppression")
     con = ledger.connect()
     anchors = landmarks.read_anchors(index["radius_m"]) if not args.no_osm else None
@@ -4512,7 +4572,7 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
                     f" suppressed; the filter ran after `emit_far` rather than before it"
                 )
 
-    # --- 6. Winding.
+    # --- 7. Winding.
     print("\nwinding (face normal against vertex normals)")
     for name, node in nodes.items():
         bad, tested = _winding_failures(node["parts"])
