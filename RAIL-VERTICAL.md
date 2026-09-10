@@ -145,6 +145,111 @@ rule 2 working, and the last three metres are a terrain question — the DEM is 
 *surface* model and the 43 m plateau over the platform is the interchange
 development on top of it — not a height-solve one.
 
+#### 3b. Amendment, 2026-09-10: the terrain question, answered
+
+§3a ended by naming the remaining error as a terrain question and handing it on.
+This is the answer, in `pipeline/sydney/bareearth.py`, gated by
+`pipeline/sydney/bare-earth-check.py`. **The rule:** inside a bridge-tagged
+station's platform extent, unioned with the footprints that intersect it, the
+lattice reads the DSM with the *built mass of those footprints deconvolved out
+of it*, before `roadgrade.solve` reads a profile.
+
+**Three candidate answers; the data on disk chose between them, and two of them
+are measurably dead.**
+
+| answer | verdict, measured |
+|---|---|
+| a bare-earth DEM beside the surface one | **not on disk.** `data/cache` holds one elevation source, `terrarium/13/*.png`. ELVIS is still a follow-up in `terrain.py`'s header |
+| a stated pad from OSM `ele` / `level` | **nothing to state.** Zero `ele` tags within 260 m of any of the three bridge-tagged stations in the extract. 453 `level` tags, all ordinal — and Chatswood's platforms are tagged `level=0` with the concourse at `−1`, which as metres is the error, not the fix |
+| DSM minus the footprints | **available, but not by masking** |
+
+The sketched form — mask every footprint's DSM cells, fill inward from the
+unmasked ring — was implemented and measured at Chatswood: the smoothed surface
+over the platforms goes **113.67 → 113.97 m, the wrong way by 0.31 m**. The
+reason is in the raw pixels. Over the 800 m square around the platforms the raw
+terrarium median *inside* a footprint of 1500 m² or more is **100.00 m** and
+outside every footprint it is **104.00 m** — roofs are not higher than the open
+ground there. Terrarium at zoom 13 is 15.87 m a pixel and Chatswood's buildings
+are 20–60 m across, so no roof owns a pixel and masking a blend and filling from
+blends recovers the blend. The identical measurement in the CBD, where the
+buildings are 150–250 m across, gives roof 45 m against open 28 m, **+17 m**. The
+estimator is not broken; it is out of resolution at a suburban centre, and a rule
+proven on the CBD would have been a rule proven on the one place it works.
+
+**What does work is subtracting rather than masking**, which is `terrain.py`'s
+own standing follow-up finally built: the smoothed surface is the smoothed bare
+ground plus the smoothed built mass, `G*(bare + coverage·height)`, and `G` is
+linear, so `coverage·height` is rasterised from the OSM footprints, convolved
+with the same 60 m Gaussian, and taken off. No mask, no hole, no dependence on a
+roof owning a pixel.
+
+| probe | DSM | built mass | bare |
+|---|---|---|---|
+| Chatswood station | 113.67 | 12.73 | 100.94 |
+| Town Hall (the origin) | 71.07 | 16.17 | 54.90 |
+| Centennial Park (control) | 27.01 | 1.21 | 25.81 |
+
+The middle row is the calibration and the reason the coefficient is **1.0 and
+not fitted**: `terrain.py` records the CBD as reading ~40 m high against a true
+~28 m AHD, and this recovers 16 m of it. It under-corrects by about two and a
+half in the one place the truth is written down, which is the side of the error a
+subtraction from the ground must be on.
+
+**The bound, which is the part that makes it safe.** Unbounded, the
+deconvolution is right about Circular Quay and unusable: it wants **15.6 m** off
+the Quay, because the CBD's towers really are in the Gaussian's tail there — and
+the Quay in this world stands 35 m over its own harbour with every wharf,
+viaduct and hero landmark built to that. So the drop at any post is floored at
+`natural − roof_cap`, where `roof_cap` is the coverage-weighted height of the
+**non-railway** buildings standing over the station's own platform decks:
+
+| station | deck | what stands on it | cap |
+|---|---|---|---|
+| Chatswood | 3,092 m² | 47% under 26 m of `building=retail` (the Interchange) | **12.12 m** |
+| Circular Quay | 1,692 m² | `building=train_station` awnings only | **0.45 m** |
+| Milsons Point | 1,650 m² | one `building=yes` the size of the deck | **6.00 m** |
+
+*A station is allowed to be as wrong as the roof over it, and no more.* A second
+floor stops a single mis-tagged `height` cratering anything: the corrected ground
+may never fall below the lowest natural ground in the 200 m ring outside the zone.
+
+**Where it runs, and the one cost that has to be stated rather than hoped away.**
+It runs **first**, before `roadgrade.solve`, because rule 1 of `pads.py` defers
+to the solved street and at Chatswood the streets stand on the same plateau the
+station does — the authority has to be corrected before it is consulted. That
+makes this the one conform pass whose write the road solve can carry outside its
+own zone: a moved post moves a road node, the graph low-pass spreads it 45 m, the
+Lipschitz clamps are transitive, and `roadgrade.conform` reaches 64 m past a
+corridor. Measured on the 5.3 km ring (Circular Quay and Milsons Point; Chatswood
+is 8,356 m out and needs the 20 km run):
+
+|  | posts | move p50 / p95 / max |
+|---|---|---|
+| moved at all | 1,693 of 148,225 (1.14%) | 0.000 / 0.769 / 2.975 m |
+| the direct write, inside the stated zones | 125 | 0.743 / — / 2.975 m |
+| the road solve's shadow, outside them | 1,568 | 0.000 / 0.411 / 2.280 m |
+
+The shadow by size is the honest picture: **583 posts over 1 mm** (furthest
+1,480 m), 294 over 5 cm, 146 over 25 cm (furthest 287 m) and **13 over a metre,
+none further than 45 m from a zone**. The far tail is the tie clamp relaxing by
+a millimetre kilometres away, which `roadgrade.py`'s `TIE_RADIUS_M` block already
+says is what a transitive Lipschitz constraint does. So the gate is stated in two
+halves and both are printed: the direct write is asserted to be inside the zones
+plus one cell, and the shadow is measured and reported rather than asserted away.
+
+**And the finding that outranks all of it.** `rail.build_all(terrain=True)` — the
+shipped `rail-bake` — loads the DEM **unconformed**: no roads, no water, no pads,
+no bare earth. So the shipped bake has never seen rule 1 either, and the
+`groundY 42.83` in §3a's Chatswood record is the raw terrarium surface to the
+centimetre (the raw drape at the station node measures 42.82). Both bakes in
+`bare-earth-check.py` are run the supported other way, with the solved lattice
+handed in. **Until `build_all`'s default changes, this pass moves the ground the
+player stands on and does not move the number the bake reports** — and that
+mismatch is not neutral: `rail-geo` chooses trench, grade or viaduct off the
+bake's profile, so a bake that still measures −3.58 m over ground that has
+dropped would carve a trench into a hole. The one-line change belongs to whoever
+owns `rail.py`; this round did not make it, and it is the next thing to do.
+
 ### 4. Access is generated, never looked up
 
 Every failure of reachability came from treating access as *content* — build it

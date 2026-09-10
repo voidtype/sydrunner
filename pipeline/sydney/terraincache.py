@@ -65,8 +65,14 @@ from .terrain import TERRARIUM_ZOOM, Terrain
 # reader *can* move the ground, and there is no way to hash "only the part that
 # can" that does not go stale the first time somebody refactors across it. One
 # recompute is the price; a stale hit is the world on the wrong ground.
+#
+# `bareearth.py` joined it with the fourth pass. It is the cheapest member of the
+# list to hash and the most dangerous to leave out: it runs *first*, so a changed
+# constant there moves the ground the road solve is then run on, and a stale hit
+# would be a whole conformed lattice built on an argument that has since changed.
 _CODE_FILES = (
     "terrain.py",
+    "bareearth.py",
     "roadgrade.py",
     "water.py",
     "pads.py",
@@ -120,6 +126,7 @@ def _key(
     conform_roads: bool,
     conform_water: bool,
     conform_pads: bool,
+    bare_earth: bool,
 ) -> str:
     pbf = config.CACHE_DIR / "sydney.osm.pbf"
     pbf_hash = _file_hash(str(pbf)) if pbf.exists() else "no-pbf"
@@ -131,6 +138,7 @@ def _key(
             f"roads={int(conform_roads)}",
             f"water={int(conform_water)}",
             f"pads={int(conform_pads)}",
+            f"bare={int(bare_earth)}",
             f"pbf={pbf_hash}",
             f"dem={_dem_signature(zoom)}",
             f"code={_code_signature()}",
@@ -149,6 +157,7 @@ def load(
     conform_roads: bool = True,
     conform_water: bool = True,
     conform_pads: bool = True,
+    bare_earth: bool = True,
     use_cache: bool = True,
 ) -> Terrain:
     """`Terrain.load` with a solved-lattice cache in front of it.
@@ -159,9 +168,11 @@ def load(
     """
     if not use_cache or _disabled():
         print("  terrain cache: off, solving fresh")
-        return Terrain.load(radius_m, zoom, conform_roads, conform_water, conform_pads)
+        return Terrain.load(
+            radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth
+        )
 
-    key = _key(radius_m, zoom, conform_roads, conform_water, conform_pads)
+    key = _key(radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth)
     cache_dir = config.CACHE_DIR / _CACHE_SUBDIR
     path = cache_dir / f"{key}.pkl"
 
@@ -176,7 +187,9 @@ def load(
             print(f"  terrain cache: hit {key[:12]} but unpickle failed ({err}); solving fresh")
 
     print(f"  terrain cache: MISS {key[:12]}, solving fresh")
-    terrain = Terrain.load(radius_m, zoom, conform_roads, conform_water, conform_pads)
+    terrain = Terrain.load(
+        radius_m, zoom, conform_roads, conform_water, conform_pads, bare_earth
+    )
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".pkl.tmp")
