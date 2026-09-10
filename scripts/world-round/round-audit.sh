@@ -45,6 +45,18 @@ run rail-audit uv run python -m sydney rail-audit
 cd $MAIN
 run chatswood-check bun run server/chatswood-check.ts
 run underground-check bun run server/underground-check.ts
+# --- the publish lists: every changed object for R2, and the server's files for the box
+echo "== publish lists $(date)"
+ls $W/tiles > $L/tiles-after.txt; ls $R/before/tiles > $L/tiles-before.txt
+comm -12 $L/tiles-before.txt $L/tiles-after.txt | xargs -P 8 -I{} sh -c 'cmp -s "'$R'/before/tiles/{}" "'$W'/tiles/{}" || echo {}' > $L/tiles-changed.txt
+comm -13 $L/tiles-before.txt $L/tiles-after.txt > $L/tiles-new.txt
+comm -23 $L/tiles-before.txt $L/tiles-after.txt > $L/tiles-gone.txt
+{ sed 's#^#tiles/#' $L/tiles-changed.txt; sed 's#^#tiles/#' $L/tiles-new.txt; sed 's#^#regions/#' $L/regions-changed.txt;
+  for f in $W/hexes/*; do b=$(basename $f); cmp -s $R/before/hexes/$b $f || echo "hexes/$b"; done;
+  for f in $W/collision/*; do b=$(basename $f); cmp -s $R/before/collision/$b $f || echo "collision/$b"; done;
+  for f in far.bin far-cover.bin far-terrain.bin far-water.bin landmarks.glb street-names.bin suburbs.json; do cmp -s $R/before/$f $W/$f || echo $f; done; } | sort -u > $R/publish-keys.txt
+{ grep -E "^tiles/.*\.(lanes|terr|pow|cars)\.bin$" $R/publish-keys.txt; grep -E "^collision/" $R/publish-keys.txt; grep -vE "^(tiles|regions|hexes|collision)/" $R/publish-keys.txt; echo root.json; echo index.json; } | sort -u > $R/box-files.txt
+echo "publish keys: $(wc -l < $R/publish-keys.txt); box files: $(wc -l < $R/box-files.txt); tiles changed $(wc -l < $L/tiles-changed.txt) new $(wc -l < $L/tiles-new.txt) gone $(wc -l < $L/tiles-gone.txt)"
 echo "== summary $(date)"
 for f in $L/*.log; do n=$(basename $f .log); tail -1 $f | cut -c1-160 | sed "s/^/$n: /"; done
 echo "AUDIT_DONE $(date)"
