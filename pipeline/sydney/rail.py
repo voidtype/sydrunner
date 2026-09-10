@@ -258,6 +258,24 @@ SHARED_NEAR_M = 1.2
 SHARED_ANTI_COS = -0.9
 
 # Vertical offsets applied to the terrain before the grade projection, metres.
+#
+# **These are offsets from the ground, and since 2026-09-10 the ground is the
+# conformed lattice** -- `build_all`'s block on `terraincache` argues that change.
+# `raw_heights` returns `terrain.sample(...) + off`, so every one of these numbers
+# now rides on the surface the player walks on rather than on the raw drape, which
+# is what makes `clearance` and `rail-geo`'s `depth` one measurement.
+#
+# It also states the limit of this arrangement plainly, and RAIL-VERTICAL.md 3b
+# already named it: **a viaduct here is an offset from the ground beneath it, not
+# a structure standing on its own piers.** Every metre a conform pass takes off
+# the ground, a `BRIDGE_RISE` deck gives up too, and only what the 3.3% grade cone
+# pulls back from approaches that did not move survives -- measured at Chatswood,
+# 7.34 m of ground bought 2.79 m of clearance. That is right for a deck over a
+# street and wrong for a span over a valley or a river the water pass has just cut
+# a bed under; the grade cone is the only thing holding those up, and it is why
+# `rail-audit`'s structure/ground conflicts are the check that matters here. A
+# real fix is a bridge whose deck is solved from its abutments, and it is not this
+# change.
 TUNNEL_DEPTH = 16.0
 BRIDGE_RISE = 7.0
 CUTTING_DROP = 4.0
@@ -5964,21 +5982,22 @@ def place_stanchions(g: RailGraph, blocks: BlockSet) -> list[Stanchion]:
 # ground, and the only processes that know the ground exactly are the two that
 # load the terrain sidecars.
 #
-# That is not a theoretical preference; it was measured. This module loads the DEM
-# **unconformed** (`build_all`: `Terrain.load(..., conform_roads=False,
-# conform_water=False, conform_pads=False)`), because the rail solve has to see
-# the ground before
-# `roadgrade.py` moved it. Against the shipped `.terr.bin` lattice, at 15,149 foot
-# paving vertices within 40 m of a corridor, that surface differs by a median of
-# 0.56 m, a p90 of 3.26 m and a maximum of 29.66 m -- and 69% of it by more than
-# the 0.30 m that `rail-geo.writeTrench`'s coping clamp can absorb before a
+# That is not a theoretical preference; it was measured. This module **used to**
+# load the DEM unconformed, and against the shipped `.terr.bin` lattice, at 15,149
+# foot paving vertices within 40 m of a corridor, that surface differed by a
+# median of 0.56 m, a p90 of 3.26 m and a maximum of 29.66 m -- 69% of it by more
+# than the 0.30 m that `rail-geo.writeTrench`'s coping clamp can absorb before a
 # retaining wall comes up through the footpath. Baking a height from it would have
 # put a second, wrong opinion about the ground into a file whose entire purpose is
-# that there is only one. Loading a *conformed* lattice here instead costs a full
-# `roadgrade.solve` -- 13 minutes against 5.7 seconds for the unconformed one --
-# to recompute a number both consumers already hold.
+# that there is only one.
 #
-# So the array is plan geometry only, and `RoadDeck` resolves the surface from the
+# UPDATE 2026-09-10: `build_all` now reads the conformed lattice through
+# `terraincache`, so that 0.56 m median is zero by construction and the objection
+# above is spent. **The array is still plan geometry only**, for the reason the
+# paragraph before it gives rather than this one: foot paving has no height of its
+# own, `streets.py` drapes it, and a height baked here would be a second copy of a
+# number `RoadDeck` already holds -- one that a partial retile could leave stale
+# while the lattice beside it moved. So `RoadDeck` resolves the surface from the
 # `groundY` its caller is already holding. See `world/road-deck.PAVING_RISE_M`.
 
 # How far from a track centreline paving has to be before the corridor can never
@@ -6480,13 +6499,17 @@ def write_bake(
 def build_all(radius_m: float, log=print, terrain=True) -> dict:
     """Read, graph, route, curve, block, solve, stanchion. Everything but writing.
 
-    `terrain` is `True` for the shipped arrangement -- load the DEM here,
-    **unconformed**, for the reason the `PAVING_REACH_M` block above sets out at
-    length -- `False` for no ground at all, or **a `Terrain` object the caller
-    has already solved**, which is the one way to measure this bake against a
-    ground that is not the raw DEM. `sydney/terrain-rules-check.py` uses it to
-    ask what Chatswood measures once `pads.py` has taken the interchange roof
-    off the platforms; nothing that ships passes it.
+    `terrain` is `True` for the shipped arrangement -- load **the conformed
+    lattice**, through `terraincache` and with every pass on, which is the same
+    ground `cli.py` cuts the tiles from and therefore the ground the player
+    stands on. `False` is no ground at all, and **a `Terrain` object the caller
+    has already solved** is passed straight through, which is how a check
+    measures this bake against a ground it built itself:
+    `sydney/bare-earth-check.py` and `sydney/terrain-rules-check.py` both do,
+    to ask what Chatswood measures with one pass off.
+
+    It used to load the raw DEM here. See the block inside for why that was
+    wrong and what it cost the trench and bore decisions downstream.
     """
     t0 = time.time()
     ways, stations, platforms, entrances = read_rail(radius_m)
@@ -6518,26 +6541,83 @@ def build_all(radius_m: float, log=print, terrain=True) -> dict:
         log(f"  terrain: {ground_note}")
     elif terrain:
         try:
-            from .terrain import Terrain
+            from . import terraincache
 
-            # All three conform passes off, and `conform_pads` is off for the
-            # same reason as the other two: this is the ground *before* anything
-            # in the pipeline told it where to be. It would otherwise default on
-            # and level a landmark's footprint into a lattice whose whole claim
-            # is that nothing has moved it -- which for Luna Park is 54 posts of
-            # difference in a surface the rail solve is entitled to read as raw.
-            field = Terrain.load(
-                radius_m, conform_roads=False, conform_water=False, conform_pads=False
-            )
+            # --- THE CONFORMED LATTICE, AND WHY IT IS NOT THE RAW DEM ANY MORE
+            #
+            # Changed 2026-09-10. This used to be
+            # `Terrain.load(radius_m, conform_roads=False, conform_water=False,
+            # conform_pads=False)` -- "the ground before anything in the pipeline
+            # told it where to be" -- and that sentence was the bug. RAIL-VERTICAL
+            # rule 3.3 does not say the DEM wins because it is raw; it says the DEM
+            # wins **"because the DEM *is* the ground we render and the player's
+            # feet stand on it"**. The ground we render is the *conformed* lattice:
+            # `cli.py`'s build cuts every `.terr.bin` from `terraincache.load(
+            # stage.radius_m)` with the road, water, pad and bare-earth passes all
+            # on. The raw drape is a fourth opinion about the ground that nothing
+            # in the world is built on and nobody stands on.
+            #
+            # What that mismatch actually cost, in two numbers that are the same
+            # quantity measured against two different grounds:
+            #
+            #   * the bake writes `vertexClearance = trackY - groundY`, and
+            #     `game/rail.deepen` turns `clearance < -DEEP_M` into `SPAN_DEEP`,
+            #     which is half of `rail-cut.drawnAsTunnel`. **The bore decision is
+            #     this array.**
+            #   * `world/rail-geo`'s PHASE_SEGMENT computes
+            #     `depth = rawGround(x, z) - trackY` off the streamed terrain and
+            #     feeds it to `rail-cut.inTrench`. **The trench decision is the
+            #     rendered lattice.**
+            #
+            # Two grounds, one railway: a bake that measured -3.58 m at Chatswood
+            # over ground the bare-earth pass had since dropped 7.36 m would decline
+            # to bore and the client would carve a trench into a hole. Reading the
+            # lattice here makes the bake's `clearance` and the client's `depth` the
+            # same number with opposite signs, by construction rather than by
+            # coincidence.
+            #
+            # AND ONE THING THE OLD LINE HAD ALREADY STOPPED MEANING. It named
+            # three flags, and `Terrain.load` grew a fourth -- `bare_earth`,
+            # defaulting on -- five days before this was written. So the "raw
+            # drape" the rail bake read had quietly become the raw drape *with the
+            # built mass deconvolved out of three station zones*: a hybrid nobody
+            # chose, produced by a positional argument list that could not notice
+            # a new keyword. `terraincache.load(radius_m)` takes every default
+            # `cli.py` takes, which is the only spelling of "the same ground as
+            # the tiles" that a new pass cannot silently break.
+            #
+            # `conform_pads` comes on with the other three and the old note about
+            # Luna Park is answered rather than ignored: a landmark pad is in the
+            # ground the player walks on, so a railway that measured itself against
+            # a lattice without it would be measuring against ground that is not
+            # there. `pads.station_pads` levels to the *solved street*, which is
+            # the surface a station's own steps land on.
+            #
+            # THE COST, WHICH IS WHY THIS IS `terraincache` AND NOT `Terrain`.
+            # A conformed 20 km solve is ~12 minutes and a 60 km one the better
+            # part of three hours; the unconformed drape was 5.7 seconds, and that
+            # gap is the only argument the old line ever had. `terraincache.load`
+            # is the same call `cli.py:561` makes with the same defaults, so the
+            # solved lattice is keyed, pickled and shared: a `rail-bake` run beside
+            # a world build is a cache hit in seconds, and a cold one pays the
+            # solve once and hands it to every build after it. Bit-identical
+            # either way -- that is the gate `terraincache`'s header lives by.
+            field = terraincache.load(radius_m)
             ground_note = (
-                f"terrarium DEM, unconformed (datum y=0 is {field.base_elevation:.1f} m AHD). "
-                "It is a *surface* model, so CBD ground reads high by roughly a "
-                "building -- which is no longer a caveat but an input: "
-                "RAIL-VERTICAL.md makes this surface the authority on where the "
-                "ground is, and clearance = trackY - groundY is measured against "
-                "it. Where OSM says bridge and this says the deck is under the "
-                "ground, the disagreement is reported by name rather than settled "
-                "by preferring the tag."
+                f"the conformed lattice, every pass on -- bare earth, roads, water, "
+                f"pads (datum y=0 is {field.base_elevation:.1f} m AHD, "
+                f"{len(getattr(field, 'pads', ()) or ())} stated pad(s), "
+                f"{len(getattr(field, 'bare_earth', ()) or ())} bare-earth zone(s)). "
+                "This is the ground the tiles are cut from and the ground the "
+                "player stands on, which is what RAIL-VERTICAL.md rule 3.3 means "
+                "by the DEM winning: clearance = trackY - groundY is measured "
+                "against the rendered surface, so the bake's clearance and "
+                "`rail-geo`'s depth are one measurement. It is still a *surface* "
+                "model underneath, so CBD ground reads high by roughly a building "
+                "except where `bareearth.py` has taken the built mass off. Where "
+                "OSM says bridge and this says the deck is under the ground, the "
+                "disagreement is reported by name rather than settled by "
+                "preferring the tag."
             )
         except Exception as exc:  # noqa: BLE001 -- reported, not swallowed
             ground_note = f"terrain unavailable ({exc.__class__.__name__}: {exc})"
