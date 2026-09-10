@@ -39,10 +39,13 @@ if missing:
 PY
 
 # --- 2. Prove three objects from outside: a tile, a region, the landmark file.
+# The probes carry the build's own ?v=, as a client does: the edge caches an immutable key
+# forever, and a bare URL answers with whatever it cached last round.
+BUILT=$(python3 -c "import json;print(json.load(open('$W/index.json'))['built'])")
 for k in $(grep -m1 '^tiles/.*\.glb$' $R/publish-keys.txt) $(grep -m1 '^regions/' $R/publish-keys.txt) landmarks.glb; do
-  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept-Encoding: br' "$CDN/$k")
+  code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Accept-Encoding: br' "$CDN/$k?v=$BUILT")
   local_md5=$(md5 -q "$W/$k")
-  remote_md5=$(curl -s -H 'Accept-Encoding: br' "$CDN/$k" | brotli -d 2>/dev/null | md5 -q)
+  remote_md5=$(curl -s -H 'Accept-Encoding: br' "$CDN/$k?v=$BUILT" | brotli -d 2>/dev/null | md5 -q)
   echo "probe $k http=$code local=$local_md5 remote=$remote_md5"
   [ "$code" = 200 ] || die "CDN probe failed for $k"
   [ "$local_md5" = "$remote_md5" ] || die "CDN bytes differ for $k"
