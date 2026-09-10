@@ -350,8 +350,28 @@ export const LANES_MAGIC = 0x454e414c;
  * global pass and bakes the winner into the sidecar. Both ends *read* it, which
  * is also why the bump is not optional: a v1 file has no park block, so a v2
  * decoder pointed at one would fall straight back to deriving.
+ *
+ * ---------------------------------------------------------------------------
+ * v4: THE FOOTPATH BAND IS TOLD WHERE THE PARKED CARS ARE.
+ *
+ * The same sentence again, about the other population that walks beside a
+ * street. `game/pedestrians.buildBands` derives a band as
+ * `centreline +/- (halfWidth + KERB_WIDTH + footpathWidth / 2)`, and a
+ * pedestrian on it is a closed-form function with no mover -- so whatever the
+ * band runs through, the walker walks through. Over four dense inner-suburb
+ * tiles, 155 of 92,152 band samples stood inside a parked car's box; with this
+ * block read, 0.
+ *
+ * A per-tile derivation cannot fix it, and for v2's reason: the offending bay
+ * never belongs to the band's own way (that arithmetic cannot touch -- see
+ * `pipeline/sydney/footbands.py`), it belongs to the street round the corner.
+ * So `footbands.py` arbitrates it in the bake, against every bay in reach and
+ * every footprint the band could be pushed into, and writes two numbers per way
+ * per side: how far the band is pushed off the kerb, and which stretches of it
+ * nobody walks. Both ends read them. A v3 file read as v4 misparses the first
+ * way's points, which is why this is exact rather than tolerant.
  */
-export const LANES_VERSION = 3;
+export const LANES_VERSION = 4;
 
 /**
  * The class byte in `.lanes.bin`, in the pipeline's own order.
@@ -741,7 +761,30 @@ export interface LaneWay {
   x: Float32Array;
   y: Float32Array;
   z: Float32Array;
+  /**
+   * v4. Metres each side's footpath band is pushed **away from the
+   * carriageway**, on top of the derived offset. Indexed as `buildBand`'s
+   * `side` is: 0 walks on the left of the way's direction of travel.
+   *
+   * Zero on a v2 or v3 file and on the 99% of v4 ways that needed nothing.
+   * `pipeline/sydney/footbands.py` decides it; nothing here derives it.
+   */
+  bandInset: readonly [number, number];
+  /**
+   * v4. Stretches of each side's band that nobody walks, as flat `[t0, t1, ...]`
+   * pairs in this way's **vertex-index space** -- 2.5 is halfway along the
+   * third segment. The band has one vertex per centreline vertex whatever the
+   * inset is, so index space is the one parameterisation the two polylines
+   * share. Empty on v2 and v3.
+   */
+  bandCuts: readonly [Float32Array, Float32Array];
 }
+
+/** A way with no band correction: v2 and v3, and every v4 way that needed none. */
+const NO_CUTS: readonly [Float32Array, Float32Array] = [
+  new Float32Array(0),
+  new Float32Array(0),
+];
 
 // --- The kerb ------------------------------------------------------------------
 
@@ -1255,7 +1298,7 @@ export function decodeLanes(
   // the world does: a v2 route has no joints and samples the crowd at its own
   // centre, which is exactly what v2 meant.
   const version = v.getUint32(4, true);
-  if (version !== LANES_VERSION && version !== 2) return null;
+  if (version !== LANES_VERSION && version !== 2 && version !== 3) return null;
   const wayCount = v.getUint32(8, true);
   const routeCount = v.getUint32(12, true);
 
@@ -1271,6 +1314,21 @@ export function decodeLanes(
     const halfWidth = v.getFloat32(o + 8, true);
     const footpathWidth = v.getFloat32(o + 12, true);
     o += 16;
+    // The band block, v4. Twelve bytes of *claim*, on the park block's terms:
+    // `pipeline/sydney/footbands.py` arbitrated it against every bay in reach,
+    // and this end reads it rather than deriving anything. See `LANES_VERSION`.
+    let inset0 = 0;
+    let inset1 = 0;
+    let nCut0 = 0;
+    let nCut1 = 0;
+    if (version >= 4) {
+      if (o + 12 > buffer.byteLength) return null;
+      inset0 = v.getFloat32(o, true);
+      inset1 = v.getFloat32(o + 4, true);
+      nCut0 = v.getUint16(o + 8, true);
+      nCut1 = v.getUint16(o + 10, true);
+      o += 12;
+    }
     if (n < 2 || o + n * 12 > buffer.byteLength) return null;
     const x = new Float32Array(n);
     const y = new Float32Array(n);
@@ -1281,7 +1339,19 @@ export function decodeLanes(
       z[i] = v.getFloat32(o + 8, true) + originZ;
       o += 12;
     }
-    ways.push({ osmId, klass, oneway: (flags & 1) !== 0, halfWidth, footpathWidth, count: n, x, y, z });
+    let bandCuts = NO_CUTS;
+    if (nCut0 !== 0 || nCut1 !== 0) {
+      if (o + (nCut0 + nCut1) * 8 > buffer.byteLength) return null;
+      const c0 = new Float32Array(nCut0 * 2);
+      const c1 = new Float32Array(nCut1 * 2);
+      for (let i = 0; i < nCut0 * 2; i++, o += 4) c0[i] = v.getFloat32(o, true);
+      for (let i = 0; i < nCut1 * 2; i++, o += 4) c1[i] = v.getFloat32(o, true);
+      bandCuts = [c0, c1];
+    }
+    ways.push({
+      osmId, klass, oneway: (flags & 1) !== 0, halfWidth, footpathWidth, count: n, x, y, z,
+      bandInset: [inset0, inset1], bandCuts,
+    });
   }
 
   for (let r = 0; r < routeCount; r++) {
@@ -4785,8 +4855,11 @@ export function verifyTraffic(
           'every car in the city would be in the wrong place.',
       );
     }
-    // v2 is still read -- see `decodeLanes` -- so a v2 world is not a failure.
-    if (contract.version !== undefined && contract.version !== LANES_VERSION && contract.version !== 2) {
+    // v2 and v3 are still read -- see `decodeLanes` -- so an older world is not
+    // a failure. It walks people through parked cars, which is what it did
+    // before v4 and is not a decode error.
+    if (contract.version !== undefined && contract.version !== LANES_VERSION
+        && contract.version !== 2 && contract.version !== 3) {
       failures.push(`The lane sidecars are v${contract.version} and this build reads v${LANES_VERSION}.`);
     }
   }
@@ -6951,6 +7024,14 @@ export function syntheticTile(
    * eight metres of *arc* expressed as route-time.
    */
   speed = 11.1,
+  /**
+   * v4's band block: the two insets and the two cut lists, for the one check
+   * that reads them back -- `game/pedestrians.verifyPedestrians`. Cuts are flat
+   * `[t0, t1, ...]` pairs in the way's vertex-index space. Ignored below v4.
+   * Last in the list so no positional caller of `speed` moves.
+   */
+  bandInset: readonly [number, number] = [0, 0],
+  bandCuts: readonly [readonly number[], readonly number[]] = [[], []],
 ): TileLanes {
   // Five vertices, the middle one doubled for a red light. World axes: north is
   // -Z, so the lane runs from z = 0 to z = -200, and the left of that is -X.
@@ -6968,7 +7049,16 @@ export function syntheticTile(
   const wayPts: Array<[number, number, number]> = [[0, laneY, 0], [0, laneY, -200]];
 
   const chainBytes = version >= 3 ? 12 : 0;
-  const bytes = new ArrayBuffer(16 + (16 + wayPts.length * 12) + 40 + chainBytes + pts.length * 16);
+  // The band block, v4: two insets, two cut counts, and the cuts themselves
+  // after the points. Zero and empty unless a caller asked for one -- see
+  // `bandInset` and `bandCuts` in this function's arguments.
+  const bandBytes = version >= 4 ? 12 : 0;
+  const cuts0 = version >= 4 ? bandCuts[0] : [];
+  const cuts1 = version >= 4 ? bandCuts[1] : [];
+  const cutBytes = (cuts0.length + cuts1.length) * 4;
+  const bytes = new ArrayBuffer(
+    16 + (16 + bandBytes + wayPts.length * 12 + cutBytes) + 40 + chainBytes + pts.length * 16,
+  );
   const v = new DataView(bytes);
   v.setUint32(0, LANES_MAGIC, true);
   v.setUint32(4, version, true);
@@ -6982,12 +7072,21 @@ export function syntheticTile(
   v.setFloat32(o + 8, SYNTHETIC_HALF_WIDTH, true);
   v.setFloat32(o + 12, 3.0, true); // footpath band
   o += 16;
+  if (version >= 4) {
+    v.setFloat32(o, bandInset[0], true);
+    v.setFloat32(o + 4, bandInset[1], true);
+    v.setUint16(o + 8, cuts0.length / 2, true);
+    v.setUint16(o + 10, cuts1.length / 2, true);
+    o += 12;
+  }
   for (const [x, y, z] of wayPts) {
     v.setFloat32(o, x, true);
     v.setFloat32(o + 4, y, true);
     v.setFloat32(o + 8, z, true);
     o += 12;
   }
+  for (const t of cuts0) { v.setFloat32(o, t, true); o += 4; }
+  for (const t of cuts1) { v.setFloat32(o, t, true); o += 4; }
   v.setUint32(o, rid, true);
   v.setUint8(o + 4, 10); // residential
   v.setUint8(o + 5, bayFlags); // which ends `bays.py` managed to claim

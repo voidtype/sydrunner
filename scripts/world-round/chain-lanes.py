@@ -20,9 +20,9 @@ side, so the same files give the same chains on any machine, and the client's
 
     python3 scripts/world-round/chain-lanes.py --world client/public/world [--dry-run] [--snapshot DIR]
 
-Writes every lane sidecar, then stamps `lanes.version = 3` and a fresh `built`
+Writes every lane sidecar, then stamps `lanes.version = NEW_VERSION` and a fresh `built`
 into index.json and root.json, so every client refetches (the tiles are
-served immutable under `?v=<built>`). `--snapshot` copies the v2 files first.
+served immutable under `?v=<built>`). `--snapshot` copies the old files first.
 """
 import argparse
 import json
@@ -53,7 +53,14 @@ def up32(value: float, floor: float) -> float:
 
 MAGIC = 0x454E414C
 OLD_VERSION = 2
-NEW_VERSION = 3
+# The version this rewrites to. It is the shipped one rather than a literal 3:
+# this tool copies the ways block through, so a world it rewrites keeps whatever
+# band block it already had, and a v2 or v3 file gains an empty one. See
+# `ZERO_BAND` and `pipeline/sydney/lanes.LANES_VERSION`.
+NEW_VERSION = 4
+# v4's band block on a way that has none: two zero insets and two zero cut
+# counts. What an older world means when it says nothing about footpath bands.
+ZERO_BAND = struct.pack("<ffHH", 0.0, 0.0, 0, 0)
 
 
 def read_tile(buf: bytes):
@@ -66,9 +73,23 @@ def read_tile(buf: bytes):
         hdr = buf[o : o + 16]
         _, _, _, n, _, _ = struct.unpack_from("<IBBHff", buf, o)
         o += 16
+        # The band block, v4: `pipeline/sydney/footbands.py`'s two insets, two
+        # cut counts, and the cuts themselves after the points. Carried through
+        # verbatim -- this tool joins routes and has no opinion about
+        # footpaths -- but it has to be *read* rather than skipped, or the
+        # points after it are read at the wrong offset and every way in the
+        # file decodes as a plausible street somewhere else.
+        band = ZERO_BAND
+        n_cuts = 0
+        if version >= 4:
+            band = buf[o : o + 12]
+            n_cuts = sum(struct.unpack_from("<HH", buf, o + 8))
+            o += 12
         pts = buf[o : o + n * 12]
         o += n * 12
-        ways.append((hdr, pts))
+        cuts = buf[o : o + n_cuts * 8]
+        o += n_cuts * 8
+        ways.append((hdr, band, pts, cuts))
     routes = []
     for _ in range(n_routes):
         rid, klass, flags, n, headway, phase = struct.unpack_from("<IBBHff", buf, o)
@@ -91,9 +112,11 @@ def read_tile(buf: bytes):
 
 def write_tile(ways, routes) -> bytes:
     out = bytearray(struct.pack("<IIII", MAGIC, NEW_VERSION, len(ways), len(routes)))
-    for hdr, pts in ways:
+    for hdr, band, pts, cuts in ways:
         out += hdr
+        out += band
         out += pts
+        out += cuts
     for r in routes:
         out += struct.pack("<IBBHff", r["rid"], r["klass"], r["flags"], r["n"], r["headway"], r["phase"])
         out += r["park"]

@@ -286,7 +286,12 @@ LANES_MAGIC = 0x454E414C  # 'LANE' little-endian
 # is not optional: v1 carried no bay at all and the client *derived* one from
 # the ways block, which is precisely the drift this version exists to end, so a
 # v1 file read by a v2 client would silently go back to deriving.
-LANES_VERSION = 3
+# v4 added, per way, the two numbers a footpath band needs in order not to run
+# through a parked car: how far the band is pushed off the kerb, and which
+# stretches of it are cut out. Exact for the same reason v2 was -- a v3 file
+# read as v4 would misparse the first way's points, and a v4 file read as v3
+# would put people back inside the cars -- and `footbands.py` is the argument.
+LANES_VERSION = 4
 
 # The class byte in the sidecar, in this order. **Append only** -- an index in a
 # file already on disk must keep meaning what it meant, exactly as
@@ -369,6 +374,20 @@ def manifest(net: LaneNetwork | None) -> dict | None:
         "kerb_width_m": streets.KERB_WIDTH,
         "carriageway_y_m": streets.CARRIAGEWAY_Y,
         "footpath_y_m": streets.FOOTPATH_Y,
+        # v4. The clearance the band block was fitted with, and the widest inset
+        # it was allowed. Here for `kerb_width_m`'s reason: the client derives a
+        # band from this file's widths and now also *reads* a correction to it,
+        # and a bake fitted with a body radius the client no longer has is a
+        # drift nothing else would report. `game/pedestrians.verifyPedestrians`
+        # asserts the first against its own `CAPSULE_RADIUS`.
+        # Imported here rather than at module scope: `footbands` reads `parking`,
+        # which reads `vegetation`, and none of that belongs in the lane solver.
+        "band_clear_m": __import__(
+            "sydney.footbands", fromlist=["PED_CLEAR_M"]
+        ).PED_CLEAR_M,
+        "band_inset_max_m": __import__(
+            "sydney.footbands", fromlist=["INSET_MAX_M"]
+        ).INSET_MAX_M,
     }
 
 # Node identity. Two way vertices are the same junction when they round to the

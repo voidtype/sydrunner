@@ -52,6 +52,7 @@ from . import (
     decks,
     elevated,
     fences,
+    footbands,
     furniture,
     geo,
     hexes,
@@ -532,7 +533,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # `driving.NOSE_STEP` climbs, the creek stand against the reach length -- and
     # a retile is hours, so the moment to find out that one of them moved is now
     # rather than at the end. They cost milliseconds and touch no data.
-    gate = decks.verify_decks() + creeks.verify_creeks()
+    gate = decks.verify_decks() + creeks.verify_creeks() + footbands.verify_footbands()
     for failure in gate:
         print(f"  SELF-CHECK   {failure}")
     if gate:
@@ -874,6 +875,7 @@ def cmd_build(args: argparse.Namespace) -> int:
     # `results` and not off the keep-out's own tally, which is a child process's
     # -- see `carriageway.report`, where that mistake is written down.
     print(carriageway.report(keep_out, results))
+    _report_footbands(results)
     _report_powerups(powerup_network)
     _report_awnings(awning_network)
     _report_doors(door_network)
@@ -1933,6 +1935,31 @@ def _report_furniture(
                 f" instances -- see furniture.{const}."
             )
 
+
+
+def _report_footbands(results: list[tiles.TileResult]) -> None:
+    """What the footpath bands cost to keep out of the parked cars.
+
+    Summed off `results` and not off a network's tally, on `carriageway.report`'s
+    reasoning and for its exact reason: `footbands.fit_tile` runs inside the
+    tile loop, the tile loop runs on a `fork` pool, and a counter incremented in
+    a child never reaches the parent's report.
+
+    A zero `blocked` here means one of two things and they are worth telling
+    apart: no band met a bay, or the pass was never attached. The line prints
+    unconditionally so that the second cannot look like the first.
+    """
+    blocked = sum(r.band_blocked for r in results)
+    inset = sum(r.band_inset for r in results)
+    cut = sum(r.band_cut for r in results)
+    refused = sum(r.band_refused for r in results)
+    lost = sum(r.band_lost_m for r in results)
+    print(
+        f"  footpath bands: {blocked:,} ran through a parked car;"
+        f" {inset:,} cleared by an inset (max {footbands.INSET_MAX_M:.1f} m),"
+        f" {cut:,} cut instead ({lost:,.0f} m of band),"
+        f" {refused:,} insets a building refused"
+    )
 
 
 def _report_lanes(net) -> None:
@@ -4646,17 +4673,31 @@ def _decode_lanes(key: str):
     magic, version, n_ways, n_routes = struct.unpack_from("<IIII", buf, 0)
     if magic != tiles.LANES_MAGIC:
         return f"magic {magic:#x}"
-    if version not in (2, tiles.LANES_VERSION):
+    if version not in (2, 3, tiles.LANES_VERSION):
         return f"version {version}"
     o = 16
     ways, routes = [], []
     for _ in range(n_ways):
         osm_id, klass, flags, n, half, foot = struct.unpack_from("<IBBHff", buf, o)
         o += 16
+        # The band block, v4. Read rather than skipped for the same reason the
+        # park block below is: a wrong offset here decodes every point in the
+        # file as a plausible street somewhere else, which is a failure this
+        # audit would report as geometry rather than as a format.
+        inset = (0.0, 0.0)
+        n_cuts = 0
+        if version >= 4:
+            i0, i1, c0, c1 = struct.unpack_from("<ffHH", buf, o)
+            inset = (i0, i1)
+            n_cuts = c0 + c1
+            o += 12
         pts = np.frombuffer(buf, dtype="<f4", count=n * 3, offset=o).reshape(n, 3)
         o += n * 12
+        cuts = np.frombuffer(buf, dtype="<f4", count=n_cuts * 2, offset=o).reshape(n_cuts, 2)
+        o += n_cuts * 8
         ways.append({"osm_id": osm_id, "klass": klass, "oneway": bool(flags & 1),
-                     "half": half, "foot": foot, "p": pts.astype(np.float64)})
+                     "half": half, "foot": foot, "p": pts.astype(np.float64),
+                     "inset": inset, "cuts": cuts.astype(np.float64)})
     for _ in range(n_routes):
         rid, klass, flags, n, headway, phase = struct.unpack_from("<IBBHff", buf, o)
         o += 16
@@ -5933,6 +5974,300 @@ def cmd_collision_fit_audit(args: argparse.Namespace) -> int:
     return EXIT_PASS if ok else EXIT_FAIL
 
 
+# --- What a dedupe round does to the ground ---------------------------------------
+#
+# Half a metre. Below it a pad has moved by the amount two nearly-identical
+# footprints disagree about their own centroid, which is noise; above it
+# something downstream that measured itself against the old ground -- a station
+# mouth, a deck soffit, a fence rail -- is measuring against a surface that is no
+# longer there. Edgecliff moved 1.18 m and cost a station.
+PAD_SHIFT_M = 0.5
+# How many rows the table prints. The number that matters is the count; the rows
+# are so a person can recognise the place.
+PAD_SHIFT_ROWS = 25
+
+
+def _pad_of(terrain, b: merge.Building) -> float:
+    """One footprint's pad, exactly as `build_tile` will write it.
+
+    `tiles._pad_and_skirt` and then `base_height`, which is the same two lines
+    `build_tile` runs, in the same order. Called rather than reimplemented for
+    the obvious reason: an audit that computes the pad its own way is auditing
+    its own arithmetic.
+    """
+    pad, _ = tiles._pad_and_skirt(terrain, b)
+    return pad + b.base_height if b.base_height > 0.0 else pad
+
+
+def _pad_row(b: merge.Building, was: float, now: float) -> tuple:
+    return (b.id, b.area, was, now, now - was, b.centroid[0], b.centroid[1])
+
+
+def _print_pad_rows(rows: list[tuple], what: str, limit: int = PAD_SHIFT_ROWS) -> None:
+    rows.sort(key=lambda r: -abs(r[4]))
+    print(f"    {'id':<20} {'area m2':>9} {'was':>9} {'now':>9} {'shift':>7}   where")
+    for rid, area, was, now, shift, e, n in rows[:limit]:
+        print(f"    {rid:<20} {area:>9,.0f} {was:>9.2f} {now:>9.2f} {shift:>+7.2f}"
+              f"   {e:,.0f} E, {n:,.0f} N   ({what})")
+    if len(rows) > limit:
+        print(f"    ... and {len(rows) - limit:,} more; --rows N for more")
+
+
+@_audit
+def cmd_pad_shift_audit(args: argparse.Namespace) -> int:
+    """Which footprints' pads a merge round moves, and by how much.
+
+    ---------------------------------------------------------------------------
+    WHY THIS EXISTS, IN ONE STATION. `merge._rank` keeps the footprint that says
+    more, which is very nearly always the larger one, and a pad is
+    `terrain.sample` at the **centroid** clamped by the lowest point under the
+    wall -- so the winner's pad is a sample of a different, larger plan than the
+    loser's. The two agree to a few centimetres on flat ground and disagree by
+    metres on a slope.
+
+    Nothing downstream is told. The dedupe's own report is
+    `osm_dropped_as_duplicate: 4,912`, which says a count and cannot say that
+    the ground under the Edgecliff Centre came up 1.18 m -- and 1.18 m was the
+    whole of the margin `game/riding.stationAccessPlan` was relying on to walk
+    that station's mouth out of the building over it. The retile that landed the
+    dedupe was correct, its counts were correct, and it broke a station. This is
+    the report that would have named it: **run it before a retile ships**.
+
+    Two sections, and they answer different halves of the question.
+
+      1. **The round against itself.** Every `(winner, loser)` the OSM dedupe
+         decided and every Microsoft footprint an OSM polygon covered, padded
+         both ways on the same terrain. This is the pass's own effect, and it
+         needs no history -- so it works on a first run, on a fresh checkout,
+         and on a radius small enough to iterate on.
+
+      2. **The round against the previous ledger.** The `buildings` table holds
+         the merged set the last build stored, so it is the previous round by
+         construction. Matched by id, which is derived from the footprint's own
+         geometry (`merge.Building.id`), so a footprint that did not move keeps
+         its key and a footprint that did is a new id and a dropped one -- which
+         section 1 has already accounted for. `--no-ledger-diff` skips it; it
+         costs a pad for every footprint in the city, twice.
+
+    WHAT IT DOES NOT MEASURE. The pad `pads.py` overrides -- under a bridge-tagged
+    station and under a hero landmark -- because those are stated extents stamped
+    on the lattice and not a function of which footprint won. `terrain-rules-check`
+    is that pass's own gate. Nor `rows.split_rows`, which cuts a terrace row into
+    houses *after* the merge: every house it makes is a new id, so section 2
+    reports them as arrivals rather than as movements, and the pad under a
+    terrace row is flat by construction.
+
+    Exit 1 when anything moved past `PAD_SHIFT_M`, which is a **report** and not
+    a defect: the honest verdict is "this round moves ground, here is where",
+    and the reader decides. `--gate 0` turns the count into a pass.
+    """
+    import sqlite3
+
+    radius = float(args.radius or config.STAGE_BY_NAME["middle"].radius_m)
+    print(f"pad-shift-audit: {radius / 1000:.0f} km, moves over {PAD_SHIFT_M:.2f} m")
+
+    # The terrain is always the middle stage's, whatever the radius: the cache is
+    # keyed on the solve and a narrower one is a fresh 60 km solve rather than a
+    # cheaper read. See `terraincache`.
+    terrain = terraincache.load(
+        config.STAGE_BY_NAME["middle"].radius_m, use_cache=not args.no_terrain_cache
+    )
+
+    print("  reading OSM extract ...")
+    osm_buildings = osm.read_buildings(radius)
+    print(f"    {len(osm_buildings):,} OSM buildings")
+    con = ledger.connect()
+    print("  loading Microsoft footprints ...")
+    ms = msbuildings.load(con, radius)
+    print(f"    {len(ms):,} Microsoft footprints")
+
+    bad = merge.verify()
+    if bad:
+        raise AuditUnresolved("the building merge control failed: " + "; ".join(bad))
+
+    pairs: list[tuple[int, int]] = []
+    drops: list = []
+    # The same conversion `merge` makes internally, over the same list in the
+    # same order -- so `pairs`, which are indices into that list, index this one.
+    osm_all = [merge._from_osm(b) for b in osm_buildings]
+    print("  merging ...")
+    t0 = time.time()
+    merged, stats = merge.merge(osm_buildings, ms, pairs, drops)
+    print(f"    {json.dumps(stats)} ({time.time() - t0:.0f}s)")
+
+    # --- 1. The round against itself.
+    print(f"\n  --- 1. the round's own replacements, padded both ways")
+    # A loser can be dropped by a footprint that is itself dropped later, so the
+    # ground it stood on ends up under the *survivor* of that chain and not under
+    # its immediate winner. Followed here rather than reported as a pair, because
+    # a two-hop shift is still one piece of ground moving once.
+    winner_of = {loser: win for win, loser in pairs}
+    survivor: dict[int, int] = {}
+    for _, loser in pairs:
+        w = loser
+        seen = 0
+        while w in winner_of and seen < 32:
+            w = winner_of[w]
+            seen += 1
+        survivor[loser] = w
+    cache: dict[int, float] = {}
+
+    def pad_i(i: int) -> float:
+        if i not in cache:
+            cache[i] = _pad_of(terrain, osm_all[i])
+        return cache[i]
+
+    osm_rows: list[tuple] = []
+    for loser, win in sorted(survivor.items()):
+        was = pad_i(loser)
+        now = pad_i(win)
+        if abs(now - was) > PAD_SHIFT_M:
+            osm_rows.append(_pad_row(osm_all[win], was, now))
+    # ...and the Microsoft side of the same sentence. A dropped footprint's
+    # ground now belongs to whichever OSM polygon covers its centroid.
+    ms_rows: list[tuple] = []
+    if drops:
+        from shapely.geometry import Point, Polygon
+        from shapely.strtree import STRtree
+
+        survivors = [b for b in merged if b.source == "osm"]
+        polys = [Polygon(b.ring, b.holes) for b in survivors]
+        polys = [(p if p.is_valid else p.buffer(0)) for p in polys]
+        tree = STRtree(polys)
+        for f in drops:
+            loser_b = merge._from_ms(f)
+            p = Point(*loser_b.centroid)
+            hit = None
+            for i in tree.query(p):
+                if polys[int(i)].contains(p):
+                    hit = survivors[int(i)]
+                    break
+            if hit is None:
+                continue
+            was = _pad_of(terrain, loser_b)
+            now = _pad_of(terrain, hit)
+            if abs(now - was) > PAD_SHIFT_M:
+                ms_rows.append(_pad_row(hit, was, now))
+    print(f"    {len(survivor):,} OSM footprints replaced, {len(osm_rows):,} moved the ground"
+          f" past {PAD_SHIFT_M:.2f} m")
+    print(f"    {len(drops):,} Microsoft footprints covered, {len(ms_rows):,} moved it")
+    if osm_rows:
+        _print_pad_rows(osm_rows, "osm dedupe", args.rows)
+    if ms_rows:
+        _print_pad_rows(ms_rows, "ms covered", args.rows)
+
+    # --- 2. The round against the previous ledger.
+    moved_against_ledger = 0
+    if args.no_ledger_diff:
+        print("\n  --- 2. skipped (--no-ledger-diff)")
+    else:
+        print(f"\n  --- 2. against the previous round, the ledger's `buildings` table")
+        con.row_factory = sqlite3.Row
+        previous = {b.id: b for b in _read_buildings_table(con)}
+        print(f"    {len(previous):,} footprints in the ledger")
+        if not previous:
+            print("    nothing to compare against; this is a first round")
+        else:
+            # Split the terrace rows first, because the ledger's set has been
+            # through `rows.split_rows` and a row's houses carry ids the
+            # un-split row does not. Without it every terrace in Sydney reads as
+            # an arrival and the comparison is a comparison of two different
+            # populations. `attributes.apply` is *not* run: it sets heights and
+            # archetypes and touches no geometry, so it cannot move a pad.
+            print("    cutting terrace rows into houses, as the build does ...")
+            split, _row_report = rows.split_rows(list(merged))
+            t0 = time.time()
+            now_rows: list[tuple] = []
+            arrived = 0
+            for b in split:
+                prev = previous.get(b.id)
+                if prev is None:
+                    arrived += 1
+                    continue
+                was = _pad_of(terrain, prev)
+                now = _pad_of(terrain, b)
+                if abs(now - was) > PAD_SHIFT_M:
+                    now_rows.append(_pad_row(b, was, now))
+            moved_against_ledger = len(now_rows)
+            print(f"    {moved_against_ledger:,} moved past {PAD_SHIFT_M:.2f} m,"
+                  f" {arrived:,} ids the ledger does not have"
+                  f" ({time.time() - t0:.0f}s)")
+            if now_rows:
+                _print_pad_rows(now_rows, "vs ledger", args.rows)
+
+    # --- The control. A synthetic pair whose pads differ by a known amount has
+    # to come out of the real reporting arithmetic at that amount, and one that
+    # does not differ has to not be reported -- a report that could only ever
+    # convict proves nothing. See `merge.verify`, which is the same argument
+    # about the same pass.
+    print("\n  --- control")
+    ctl = _pad_shift_control(terrain)
+    for line in ctl:
+        print(f"    CONTROL  {line}")
+    if ctl:
+        raise AuditUnresolved("the pad-shift control failed; the table above is not evidence")
+    print("    a 2 m step under a swallowed footprint is reported at 2 m,"
+          " and a flat one is not reported")
+
+    total = len(osm_rows) + len(ms_rows) + moved_against_ledger
+    gate = int(args.gate)
+    print(f"\n  {total:,} footprints move the ground past {PAD_SHIFT_M:.2f} m"
+          f" (gate {gate:,})")
+    if total > gate:
+        print("  FAIL: this round moves ground under footprints something else may"
+              " have measured itself against. Read the rows; they are places, not"
+              " statistics.")
+        return EXIT_FAIL
+    print("  PASS")
+    return EXIT_PASS
+
+
+def _pad_shift_control(terrain) -> list[str]:
+    """A step of known height under a known pair, through the real functions."""
+    import numpy as np
+
+    class _Step:
+        """A two-level ground: `high` east of x = 0, `low` west of it."""
+
+        def __init__(self, low: float, high: float) -> None:
+            self.low = low
+            self.high = high
+
+        def sample(self, e, n=None):
+            e = np.asarray(e, dtype=np.float64)
+            return np.where(e >= 0.0, self.high, self.low)
+
+        def densify(self, ring):
+            return np.asarray(ring, dtype=np.float64)
+
+    def mk(ident: str, x0: float, x1: float) -> merge.Building:
+        ring = np.asarray(
+            [(x0, 0.0), (x1, 0.0), (x1, 20.0), (x0, 20.0)], dtype=np.float64
+        )
+        return merge.Building(
+            id=ident, source="osm", ring=ring, area=abs(x1 - x0) * 20.0,
+            centroid=(0.5 * (x0 + x1), 10.0),
+        )
+
+    bad: list[str] = []
+    step = _Step(0.0, 2.0)
+    # The loser sits wholly on the low side; the winner spans the step and takes
+    # its pad from a centroid on the high side. `WALL_SKIRT_MAX` is 8 m, so the
+    # 2 m step never reaches the clamp and the pads are the samples themselves.
+    loser = mk("o1", -30.0, -10.0)
+    winner = mk("o2", -30.0, 40.0)
+    was = _pad_of(step, loser)
+    now = _pad_of(step, winner)
+    if abs((now - was) - 2.0) > 1e-9:
+        bad.append(f"a 2 m step under a swallowed footprint reports {now - was:.3f} m")
+    if not abs(now - was) > PAD_SHIFT_M:
+        bad.append("a 2 m shift does not clear the reporting threshold")
+    flat = _Step(5.0, 5.0)
+    if abs(_pad_of(flat, winner) - _pad_of(flat, loser)) > PAD_SHIFT_M:
+        bad.append("flat ground under both footprints is reported as a move")
+    return bad
+
+
 @_audit
 def cmd_rail_veg_audit(args: argparse.Namespace) -> int:
     """RULE 3. No tree stands inside the rail corridor.
@@ -7033,6 +7368,34 @@ def main(argv: list[str] | None = None) -> int:
     cf.add_argument("--max-added", type=float, default=0.0,
                     help="m2 of solid the collision may add over the whole build")
     cf.set_defaults(func=cmd_collision_fit_audit)
+
+    ps = sub.add_parser(
+        "pad-shift-audit",
+        help="which footprints' pads a merge round moves, and by how much",
+        description=cmd_pad_shift_audit.__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    ps.add_argument("--radius", type=float, default=None,
+                    help="metres of extract to merge; defaults to the middle stage."
+                    " The terrain is always the middle stage's whatever this says --"
+                    " see the command.")
+    ps.add_argument("--no-ledger-diff", action="store_true",
+                    help="skip section 2, which costs a pad for every footprint"
+                    " in the city twice and needs a ledger to compare against")
+    ps.add_argument("--no-terrain-cache", action="store_true",
+                    help="solve the terrain lattice fresh rather than loading the"
+                    " cached solve; see `terraincache`")
+    # A gate rather than a budget, and it is 0 because the honest default for
+    # "this round moves ground" is to say so. A round that legitimately moves a
+    # thousand pads sets it and records why, exactly as the clash budgets do.
+    ps.add_argument("--rows", type=int, default=PAD_SHIFT_ROWS,
+                    help="rows of each table to print. The count above it is"
+                    " the number that matters; the rows are so a person can"
+                    f" recognise the place. Default {PAD_SHIFT_ROWS}.")
+    ps.add_argument("--gate", type=int, default=0,
+                    help="footprints allowed to move past the threshold before"
+                    " this fails")
+    ps.set_defaults(func=cmd_pad_shift_audit)
 
     rv = sub.add_parser(
         "rail-veg-audit",

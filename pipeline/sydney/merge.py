@@ -326,8 +326,18 @@ def _detail(b: Building) -> int:
     )
 
 
-def _dedupe_osm(out: list[Building]) -> tuple[list[int], dict[str, int]]:
+def _dedupe_osm(
+    out: list[Building], pairs: list[tuple[int, int]] | None = None
+) -> tuple[list[int], dict[str, int]]:
     """The indices of `out` that survive: one of every duplicated pair goes.
+
+    `pairs` collects `(winner, loser)` index pairs as they are decided, for a
+    caller that needs to know *which* footprint replaced which -- `cli`'s
+    `pad-shift-audit` is the one, and it exists because the winner's pad is
+    sampled over a different plan from the loser's and the ground under a
+    station mouth can move a metre without one line of this changing. Purely an
+    observation channel: nothing here reads it back and the walk is identical
+    whether it is passed or not.
 
     Indices rather than the buildings themselves so `merge` can drop the same
     entries out of the raw `osm_buildings` list in lockstep -- the two lists are
@@ -394,6 +404,8 @@ def _dedupe_osm(out: list[Building]) -> tuple[list[int], dict[str, int]]:
                 exact += 1
             loser = j if _rank(out[i]) >= _rank(out[j]) else i
             dropped.add(loser)
+            if pairs is not None:
+                pairs.append((j if loser == i else i, loser))
             if loser == i:
                 break
     keep = [k for k in range(len(out)) if k not in dropped]
@@ -561,11 +573,21 @@ def _verify_swallow() -> list[str]:
 
 
 def merge(
-    osm_buildings: list[osm.OsmBuilding], ms_footprints: list[msbuildings.Footprint]
+    osm_buildings: list[osm.OsmBuilding],
+    ms_footprints: list[msbuildings.Footprint],
+    osm_pairs: list[tuple[int, int]] | None = None,
+    ms_drops: list[msbuildings.Footprint] | None = None,
 ) -> tuple[list[Building], dict[str, int]]:
-    """OSM first -- deduplicated against itself -- then Microsoft's gaps."""
+    """OSM first -- deduplicated against itself -- then Microsoft's gaps.
+
+    `osm_pairs` and `ms_drops` are the observation channels `_dedupe_osm`'s own
+    argument describes: who replaced whom, and which Microsoft footprints an OSM
+    polygon covered. `cli.pad-shift-audit` reads them to ask what the round did
+    to the *ground* under each replacement, which is a question the counts in
+    `stats` cannot answer. Nothing here reads them back.
+    """
     osm_all = [_from_osm(b) for b in osm_buildings]
-    kept, osm_stats = _dedupe_osm(osm_all)
+    kept, osm_stats = _dedupe_osm(osm_all, osm_pairs)
     out = [osm_all[i] for i in kept]
     # In lockstep, so the Microsoft pass below measures itself against the OSM
     # set that is actually going into the world. A duplicate left in the tree
@@ -651,6 +673,8 @@ def merge(
                 dropped += 1
                 dropped_by_union += union_hit
                 dropped_by_swallow += swallow_hit
+                if ms_drops is not None:
+                    ms_drops.append(f)
                 continue
         out.append(_from_ms(f))
 

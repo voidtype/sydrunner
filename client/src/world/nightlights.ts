@@ -6856,6 +6856,10 @@ export function verifyNightLights(): string[] {
     x: new Float32Array([x0, x1]),
     y: new Float32Array([0, 0]),
     z: new Float32Array([z0, z1]),
+    // v4's band block, which this fixture is not about: a street with no cars
+    // parked on it needs no inset and no cut. See `traffic.LANES_VERSION`.
+    bandInset: [0, 0],
+    bandCuts: [new Float32Array(0), new Float32Array(0)],
   });
   const emptyPower = (count: number, at: (i: number) => [number, number]): TilePower => {
     const power: TilePower = {
