@@ -119,11 +119,12 @@ the bridge have all been built to that. A rule about a station's platforms is
 not allowed to be the thing that discovers a thirty-metre error in the CBD. So
 the subtraction is floored at `natural - roof_cap`, where `roof_cap` is the
 coverage-weighted height of the non-railway buildings standing over the
-station's own decks. Chatswood's decks are 47% covered by 26 m of `retail` and
-the cap is 12.12 m, which does not bind; Circular Quay's are covered by
-`building=train_station` awnings and nothing else, so its cap is 0.00 m and the
-rule declines the station outright. **A station is allowed to be as wrong as the
-roof over it, and no more.**
+station's own decks. Chatswood's decks are 47% covered by 26 m of `retail`, so
+its cap is **12.12 m** and it binds -- the deconvolution wanted 12.73. Circular
+Quay's decks carry `building=train_station` awnings and nothing else, so its cap
+is **0.45 m** and the 15.6 m becomes 16 cm. Milsons Point's is **6.00 m**, one
+`building=yes` the size of the deck. **A station is allowed to be as wrong as
+the roof over it, and no more.**
 
 **And it may not dig below the ground around it.** `FLOOR_RING_M` metres outside
 the zone the surface is whatever it was; the corrected ground inside is clamped
@@ -150,7 +151,30 @@ projections, so a post moved inside the zone can move a *road* node outside it,
 and `roadgrade.conform` then reaches `LATTICE_REACH_M + FEATHER_M` past that
 road's corridor. `bare-earth-check.py` measures exactly how far that carries and
 prints it; the zone-plus-one-cell assertion is made against the direct write and
-the road solve's own shadow is reported beside it as its own number.
+the road solve's own shadow is reported beside it as its own number. Measured on
+the 20 km ring: **205 posts written inside the zones, 3,600 outside them**, of
+which 1,098 moved more than a millimetre and **75 more than a metre, none
+further than 65 m from a zone**.
+
+## What this does not reach, and whose problem the rest is
+
+Chatswood comes out at **+2.26 m** of clearance against **−0.53 m** from the same
+bake without this pass, and its structure/ground conflict clears. The brief asked
+for +5 m of median clearance and it is not there -- but the reason is no longer
+the terrain. The ground under the platform came down about 7 m and the clearance
+gained 2.79, because `rail.raw_heights` gives a bridge node
+`terrain.sample(...) + BRIDGE_RISE`: a viaduct in that bake is an **offset from
+the ground beneath it** rather than a structure standing on its own piers, so the
+deck follows the ground down and only what the 3.3% grade projection restores
+survives. 38 cents in the dollar, measured. RAIL-VERTICAL.md section 3b carries
+the arithmetic.
+
+And one thing the round that fixes it has to know first: `rail.build_all(
+terrain=True)` -- the shipped `rail-bake` -- reads the DEM **unconformed**, so it
+has never seen rule 1 either and does not see this. Until that default changes,
+this pass moves the ground the player stands on and not the number the bake
+reports; and a bake still measuring −0.53 m over ground that has dropped 7 m
+would have `rail-geo` carve a trench into a hole.
 """
 
 from __future__ import annotations
@@ -241,9 +265,11 @@ def roof_cap(decks, footprints, heights, kinds) -> float:
     the three answers are the argument:
 
         Chatswood        3,092 m2 of deck, 47% of it under 26 m of `retail`
-                         (the Interchange), cap **12.12 m**
+                         (the Interchange), cap **12.12 m** -- and it binds:
+                         the deconvolution wanted 12.73
         Circular Quay    every polygon over the decks is `building=train_station`
-                         -- the Cahill viaduct's own awnings -- cap **0.00 m**
+                         -- the Cahill viaduct's own awnings -- cap **0.45 m**,
+                         which turns 15.6 m into 16 cm
         Milsons Point    one `building=yes` the size of the deck and a `roof`
                          over it: the platform canopy, cap **6.00 m**
 
@@ -255,6 +281,11 @@ def roof_cap(decks, footprints, heights, kinds) -> float:
     rule about a station's platforms may not be the thing that discovers it. The
     cap says: **a station is allowed to be as wrong as the roof over it, and no
     more.**
+
+    Zero is a real answer and `station_pads` treats it as one -- a station with
+    nothing but its own canopy over the deck is declined outright rather than
+    written with a zero drop. No station in the 20 km extract is declined; all
+    three have something, and two of them have almost nothing.
     """
     if not decks or not len(footprints):
         return 0.0

@@ -694,6 +694,18 @@ def _bilinear(grid: np.ndarray, x, y):
 # the unbuilt ground around each block -- is tractable and needs no new source.
 # Both are their own pass. Neither changes anything below `_load_dem`.
 #
+# UPDATE 2026-09-10: the second one is built, in `bareearth.py`, and is the
+# `bare_earth` pass above. Two corrections to the sketch, both measured there:
+# the hole-fill is not needed and does not work (at 15.87 m a pixel a suburban
+# roof never owns a pixel, so masking a blend and filling from blends recovers
+# the blend -- it moved Chatswood 0.31 m the wrong way), and the subtraction is
+# the whole method on its own, because the smoothing is linear. It is applied
+# **only inside bridge-tagged station zones** and bounded by the roof over the
+# platforms, deliberately: unbounded it wants 15.6 m off Circular Quay, which is
+# the CBD error this note is about and not a thing a station rule gets to fix.
+# Applying it city-wide is still the follow-up; what exists is the narrowest
+# version that answers RAIL-VERTICAL.md section 3a.
+#
 # UPDATE: the *worst* consequence of it has since been dealt with separately, and
 # it is worth being clear about which. The contamination made the roads unusable
 # -- a tower footprint next to true ground is a 45 degree facet and the road drapes

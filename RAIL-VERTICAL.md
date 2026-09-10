@@ -223,19 +223,80 @@ Lipschitz clamps are transitive, and `roadgrade.conform` reaches 64 m past a
 corridor. Measured on the 5.3 km ring (Circular Quay and Milsons Point; Chatswood
 is 8,356 m out and needs the 20 km run):
 
-|  | posts | move p50 / p95 / max |
+|  | 5.3 km: posts, p50 / p95 / max | 20 km: posts, p50 / p95 / max |
 |---|---|---|
-| moved at all | 1,693 of 148,225 (1.14%) | 0.000 / 0.769 / 2.975 m |
-| the direct write, inside the stated zones | 125 | 0.743 / — / 2.975 m |
-| the road solve's shadow, outside them | 1,568 | 0.000 / 0.411 / 2.280 m |
+| moved at all | 1,693 of 148,225 (1.14%), 0.000 / 0.769 / 2.975 m | 3,805 of 1,723,969 (0.22%), 0.000 / 1.122 / 8.112 m |
+| the direct write, inside the stated zones | 125, p50 0.743, max 2.975 m | 205, p50 1.957, max 8.112 m |
+| the road solve's shadow, outside them | 1,568, 0.000 / 0.411 / 2.280 m | 3,600, 0.000 / 0.411 / 5.219 m |
 
-The shadow by size is the honest picture: **583 posts over 1 mm** (furthest
-1,480 m), 294 over 5 cm, 146 over 25 cm (furthest 287 m) and **13 over a metre,
-none further than 45 m from a zone**. The far tail is the tie clamp relaxing by
-a millimetre kilometres away, which `roadgrade.py`'s `TIE_RADIUS_M` block already
-says is what a transitive Lipschitz constraint does. So the gate is stated in two
-halves and both are printed: the direct write is asserted to be inside the zones
-plus one cell, and the shadow is measured and reported rather than asserted away.
+The shadow by size is the honest picture. At 20 km: **1,098 posts over a
+millimetre**, 748 over a centimetre (furthest 475 m), 521 over 5 cm, 269 over
+25 cm (furthest 287 m) and **75 over a metre, none further than 65 m from a
+zone**. The far tail — one post 18 km out — is the tie clamp relaxing by a
+millimetre, which `roadgrade.py`'s `TIE_RADIUS_M` block already says is what a
+transitive Lipschitz constraint does. On the street surface itself, 4,690 of
+1,002,862 segments changed height (0.47%), p95 2.22 m, and **none further than
+641 m from a zone**. So the gate is stated in two halves and both are printed:
+the direct write is asserted to be inside the zones plus one cell, and the
+shadow is measured and reported rather than asserted away.
+
+**What it bought, per zone**, ground at each station node:
+
+| station | ground off | ground on | move | zone posts, p50 / max |
+|---|---|---|---|---|
+| Chatswood | 40.85 | 33.49 | **−7.36 m** | 76, 5.64 / 8.11 |
+| Circular Quay | −33.68 | −33.83 | −0.16 m | 73, 0.13 / 0.45 |
+| Milsons Point | −32.95 | −35.13 | −2.18 m | 65, 1.51 / 2.98 |
+
+**And what the rail bake makes of it**, both bakes run at 20 km with the solved
+lattice handed to `rail.build_all`:
+
+| | pass off | pass on |
+|---|---|---|
+| `clearance` (median over the platform) | **−0.53 m** | **+2.26 m** |
+| `clearanceLo` / `clearanceHi` | −5.49 / +4.68 | −1.34 / **+6.05** |
+| `groundY` | 40.86 | 33.50 |
+| `trackY` | 42.05 | 40.24 |
+| `siteY` | 40.36 | 35.68 |
+| `vertical` / `structure` | surface / bridge | surface / bridge |
+| `conflict` | recorded | **empty** |
+
+Elsewhere: Circular Quay −6.85 → −6.74, Milsons Point +0.99 → +3.08, and over
+the whole scoped bake **one station of 156 moved more than a metre of `siteY`,
+and it is Chatswood**. `rail-audit` takes structure/ground conflicts from 4 to 2
+and leaves the 47 stations more than a metre under the terrain exactly where
+they were. `landmark-audit` moves two heroes and by the road shadow only — the
+bridge's north ramp clearance 8.281 → 8.329, and Luna Park's whole block by a
+uniform 0.399 m — with the Opera House and Sydney Tower identical to the
+millimetre.
+
+**Why it is +2.26 and not +5, with the arithmetic.** The ground under the
+platform came down by 3.6 to 7.6 m along its 202 m, about 7 m at the centre, and
+the clearance gained 2.79 m. The deck followed the ground down for the rest, and
+the reason is one line of `rail.raw_heights`: a bridge node's raw height is
+`terrain.sample(...) + BRIDGE_RISE`, and `BRIDGE_RISE` is 7.0 m. A viaduct in
+this bake is **an offset from the ground beneath it, not a structure standing on
+its own piers** — so every metre the terrain gives up, the deck gives up too, and
+what survives is only what the 3.3% grade projection restores by pulling the
+deck back toward approaches that did not move. Measured: 7.34 m of ground bought
+2.79 m of clearance, 38 cents in the dollar. To reach +5 m at that exchange rate
+would need about 14.5 m of ground — past the 12.12 m of roof there is over the
+deck to justify taking off, and past what is on the site to take. The *node*
+clearance is already +6.74, essentially `BRIDGE_RISE`, and `clearanceHi` is
++6.05: the top quarter of the platform is over the target and the median is held
+down by the ends, where there is no Interchange overhead and so nothing for this
+rule to remove. **The last three metres are no longer a terrain question. They
+are `raw_heights`'s.**
+
+**A fence that will need restating.** `server/chatswood-check.ts` asserts
+`siteY > 38.0`. With the ground under the station 7 m lower the trains correctly
+stand at 35.68 and that assertion flips to FAIL — it is a fence on an absolute
+height written when the bake read the raw DEM, and it wants to be a fence on
+clearance. Run against the two scoped bakes the file is otherwise identical: both
+fail its section 2 for the same 115 reasons (a 156-station 20 km bake against a
+267-station 60 km baseline), and the *only* differences the pass makes to its
+output are Chatswood's own row, Milsons Point moving 0.19 m further, and that one
+fence.
 
 **And the finding that outranks all of it.** `rail.build_all(terrain=True)` — the
 shipped `rail-bake` — loads the DEM **unconformed**: no roads, no water, no pads,
