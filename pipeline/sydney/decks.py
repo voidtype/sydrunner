@@ -152,6 +152,123 @@ six metres up is no longer paving that carries the ground, and
 `DECK_CARRIES_GROUND_M` on that side is the other half of this seam.
 
 ---------------------------------------------------------------------------
+**THE THIRD BUG: A DECK IS SOLVED FROM ITS STRUCTURE, NOT FROM THE GROUND
+BENEATH IT, WHERE THE GROUND IS A STATION'S.**
+
+`RAIL-VERTICAL.md` section 3b added a pass that lowers the ground inside a
+bridge-tagged station's platform zone, by deconvolving the built mass out of the
+DSM -- the right answer to "a station is not standing on its own roof", and it
+took 2.18 m off Milsons Point and 7.36 m off Chatswood. Measured on the round
+that shipped it, `server/clash-check.ts --near 185,-2719 --radius 450` went from
+**47 `DECK_IN_BUILDING` pairs to 145**, and every one of the 98 new ones is the
+Harbour Bridge's northern approach: 84-90 m2 of deck inside a building each, at
+E 192-213, N 2630-2700, which is the whole of a deck segment's plan.
+
+The mechanism is one line of this module, and it is the road-deck spelling of
+the sentence `RAIL-VERTICAL.md` section 3c ends on about `rail.raw_heights`:
+
+    ground = terrain.sample(...)          # every node
+    ground_floor = ground + CARRIAGEWAY_Y # the floor the profile is held above
+
+A viaduct here is **an offset from the ground beneath it**, so every metre the
+bare-earth pass takes off a station's ground, the deck over that station gives
+up too -- and the buildings on that ground give up a *different* number of
+metres, because `tiles._pad_and_skirt` samples the lattice at a footprint's
+centroid and this solve samples it at a station of a deck run. Measured from the
+shipped bytes on either side of the round, at the worst of them:
+
+    E 203.2 N 2638.3   ground  -33.58 -> -35.69   deck  -33.57 -> -35.39
+    E 207.0 N 2643.6   the pad under `o1069460235`  -33.95 -> -35.98
+
+The ground fell 2.11 m, the pad fell 2.03 m, and the deck fell 1.82 m. **That
+last 0.21 m is the whole of the regression, and it is worth being exact about
+why, because "the deck fell into the roofs" is the obvious story and it is not
+this one.** Before the round the deck lay on its ground at a clearance of
+**0.02 m**, and `PRISM_MIN_RISE_M` is 0.35 -- so it had *no collision volume at
+all*, and the fact that it ran through a footprint was invisible to everything
+that measures the world. After it, the clearance is 0.30 to 0.65 m, every
+segment earns a prism, and 98 prisms appear inside a footprint they have always
+been inside. A deck that stops following its ground exactly is a deck that
+starts existing.
+
+The rule, stated once and in the same shape as the crossing rule above:
+
+  **Where a station's correction reached the ground, a deck's ground reference
+  is the ground the deck's own approaches see, interpolated across the corrected
+  stretch from the two stations either side of it -- never the ground inside it,
+  and never lower than it.**
+
+`_station_zone_ground` is the rule. The zone is `pads.bridge_station_zones`
+buffered by `STATION_SHADOW_M` -- and that buffer is the whole of what makes the
+rule reach the defect it was written for. Measured: the Milsons Point zone is
+E 100.9-278.1, N 2408.3-2684.0, and the Bradfield Highway approach's centreline
+runs **4.36 m outside it and 0.0 m inside it** for its whole 182 m. The rule
+keyed on the bare zone lifted 51 deck nodes in the whole 60 km by at most 0.89 m
+and did not touch Milsons Point at all -- `clash-check` came back 145 against
+145, four rows differing by one square metre of rounding. The reason is in
+`RAIL-VERTICAL.md` section 3b's own gate: the pass writes inside the zone, and
+then **`roadgrade.conform` carries that write outward**, 1,568 posts at 5.3 km
+and 3,600 at 20 km, "none further than 65 m from a zone". The ground the
+Bradfield approach stands on came down by 1.5 to 2.1 m and every metre of it is
+a station's correction arriving through the road solve.
+
+The interpolation is along the run's own arclength between the last station
+outside the buffered zone at each end. A run that leaves the extent inside one
+holds the one end it has; a run with neither end outside is left alone, because
+there is nothing to interpolate from and a rule with no evidence should not have
+an opinion.
+
+Three things this deliberately does:
+
+**It is one-sided.** The result is `maximum(measured, interpolated)`, so it can
+only hold a deck up. That is not timidity, it is the shape of the thing being
+undone: `bareearth.conform` writes `minimum(natural, ...)` and can only lower,
+so an interpolation that came out *under* the measured ground is measuring the
+landform rather than the correction, and the landform is not this rule's
+business. Every station zone whose ground did not move is a no-op by
+construction.
+
+**It does not move a touchdown.** The substitute ground feeds `ground_floor`
+only. `pinned` heights stay `terrain.sample(node) + CARRIAGEWAY_Y`, because a
+touchdown is a measurement of the asphalt the deck actually meets and that
+asphalt is on the lowered ground -- the header's first property, no lip at the
+join, outranks this rule and says so. Where the two disagree the grade clamp
+carries it, exactly as it carries the crossing demand.
+
+**It does not move the ground either**, for the crossing rule's own reason. The
+station's ground is right; it is the deck that was reading it as if it were a
+statement about the structure. `DeckRun.ground` therefore keeps the measured
+value, so the clearance, the parapet ramp and the pier feet are all still
+measured against the ground the player stands on.
+
+**And what it is worth, measured, on a scoped emit of the five bridge-station
+zones overlaid on the round-two world.** It is a small rule and its own numbers
+say so: **164 of 31,167 deck nodes stand inside a buffered zone and 23 of them
+are lifted**, p50 0.72 m and max 1.71 m. Every other line of this module's
+report is unchanged to the digit -- the grade percentiles, the step, the
+clearance distribution, the 1,294 crossings and their clearances.
+
+The two zones it reaches are the two the Harbour Bridge's own approaches run
+through, and at both of them the deck stops lying on its ground and becomes a
+structure with a soffit:
+
+| | Milsons Point | Circular Quay |
+|---|---|---|
+| deck solids in the box, before | 98 in embankment form | **0** |
+| after | 98, `WALK_UNDER_M` clear | **38** |
+| `overpass-clearance` under 5 m | 34 -> 34 | **32 -> 28** |
+
+Circular Quay is the one to read. `RAIL-VERTICAL.md` section 3c records the
+Cahill viaduct there as **6.74 m under the ground it flies over**, a named open
+defect that document forbids editing away. This lifts it 1.3 to 2.1 m toward its
+own abutments and four more roads come unblocked. It also costs ten
+`DECK_IN_BUILDING` pairs, and that cost is the same sentence read forwards: a
+deck with no prism cannot be convicted of anything, and one polygon at the Quay
+-- `o1238793344`, 174 m2, 38% of its plan surviving the deck corridor -- has had
+the Cahill inside it all along. See `elevated.VIADUCT_PLAN_SHARE` for why that
+one is refused rather than dropped.
+
+---------------------------------------------------------------------------
 **What is suppressed, and why the Harbour Bridge is not here.**
 
 `landmarks.py` builds the Harbour Bridge by hand, deck included, and its deck is
@@ -368,6 +485,30 @@ PRIVATE_CLASSES = frozenset({"service"})
 # Sized at the largest reach any one query has -- a 30 m road half width plus a
 # 20 m deck half width plus a station -- so a lookup is exactly nine cells.
 CROSS_CELL_M = 64.0
+
+# --- The station-zone rule -----------------------------------------------------
+
+# How far past a bridge-station zone the ground is still that station's, metres.
+#
+# `pads.bridge_station_zones` is where `bareearth.conform` *writes*. It is not
+# where the write ends up. `roadgrade.solve` reads the corrected posts, the
+# graph low-pass spreads a moved node 45 m, the Lipschitz clamps are transitive,
+# and `RAIL-VERTICAL.md` section 3b measures the result on two rings: 1,568
+# posts moved outside the zones at 5.3 km and 3,600 at 20 km, of which 75 moved
+# more than a metre and **"none further than 65 m from a zone"**.
+#
+# 65 m is that number, taken from the measurement rather than chosen, and the
+# rule needs it: the Milsons Point zone is E 100.9-278.1 N 2408.3-2684.0 and the
+# Bradfield Highway approach runs **4.36 m outside it** along its whole 182 m,
+# so the un-buffered rule missed by four metres the one deck it was written for.
+# At 30 m the buffer catches 159 m of that approach and at 65 m it catches all
+# 182 m.
+#
+# It is not a licence to reach further. The rule stays one-sided -- see
+# `_station_zone_ground` -- so a buffer that is too generous costs nothing on
+# ground the correction never touched: the interpolation comes out at or under
+# the measured ground and the `maximum` returns the measurement.
+STATION_SHADOW_M = 65.0
 
 # --- The structure -------------------------------------------------------------
 
@@ -609,11 +750,21 @@ class DeckNetwork:
                 if len(pts) >= 2 and piece.length >= MIN_RUN_M:
                     clipped.append((r, pts))
 
+        # The extents inside which the ground is a station's rather than the
+        # deck's -- see the header's third bug. Read here rather than inside
+        # `_solve` so the one call to `pads.bridge_station_zones` is visible at
+        # the level that owns the radius, and so a caller with no rail bake
+        # (`verify_decks`, a scoped probe) can hand in an empty list.
+        from . import pads
+
+        zones = pads.bridge_station_zones(radius_m)
+
         runs, solve_stats, crossings = _solve(
             clipped,
             ground_nodes,
             terrain,
             [r for r in roads if _is_ground_carriageway(r) and r.highway not in PRIVATE_CLASSES],
+            zones,
         )
         # After the solve and before anything reads a station, because everything
         # that reads one -- the ribbon, the prisms, the piers, the tile index --
@@ -874,7 +1025,9 @@ def hero_bridge_zone(anchors: dict, zones: dict) -> Polygon:
 # --- The solve -----------------------------------------------------------------
 
 
-def _solve(clipped, ground_nodes: set, terrain, ground_roads) -> tuple[list[DeckRun], dict, list[dict]]:
+def _solve(
+    clipped, ground_nodes: set, terrain, ground_roads, zones=()
+) -> tuple[list[DeckRun], dict, list[dict]]:
     """Station every run, wire them into one graph, and solve the profile.
 
     `ground_roads` is the public surface carriageway set the crossing rule is
@@ -883,6 +1036,10 @@ def _solve(clipped, ground_nodes: set, terrain, ground_roads) -> tuple[list[Deck
     a second `read_roads` here would be a second set of `OsmRoad` objects
     describing the same ways, which is the mistake `lanes._HeightField`'s
     comment exists to stop coming back.
+
+    `zones` is `pads.bridge_station_zones` -- the extents inside which the ground
+    under a deck is a statement about a railway station and not about the
+    structure over it. See `_station_zone_ground` and the header's third bug.
     """
     if not clipped:
         return [], {"nodes": 0, "pinned": 0, "components": 0, "unpinned_components": 0}, []
@@ -974,9 +1131,14 @@ def _solve(clipped, ground_nodes: set, terrain, ground_roads) -> tuple[list[Deck
     # it was written as a height rather than as a solve of its own: the loop
     # already knew how to hold a lower bound against a grade clamp, and a second
     # solve would have been a second opinion about where the deck is.
+    # And the ground the *structure* is solved from, which inside a bridge-
+    # station zone is not the ground under it. The header's third bug is the
+    # argument; note that only the floor reads it, so a touchdown is untouched.
+    struct_ground, zone_stats = _station_zone_ground(stations, node_of, ground, n_nodes, zones)
+
     h = _harmonic(h, edge, elen, pinned)
     free = ~pinned
-    ground_floor = ground + streets.CARRIAGEWAY_Y
+    ground_floor = struct_ground + streets.CARRIAGEWAY_Y
     lim = MAX_GRADE * elen
     # What the touchdowns and `TOUCHDOWN_RAMP_GRADE` between them will allow.
     # Computed once, from the pinned heights, which never move. See
@@ -1058,10 +1220,108 @@ def _solve(clipped, ground_nodes: set, terrain, ground_roads) -> tuple[list[Deck
             "pinned": int(pinned.sum()),
             "components": int(n_comp),
             "unpinned_components": len(unpinned),
+            **zone_stats,
             **cross_stats,
         },
         crossings,
     )
+
+
+# --- The station-zone ground -----------------------------------------------------
+
+
+def _station_zone_ground(stations, node_of, ground: np.ndarray, n_nodes: int, zones):
+    """The ground a deck is solved from, where the ground is a station's.
+
+    The header's third bug is the argument. Here is the mechanic, and it is
+    deliberately the smallest one that states the rule:
+
+      * a station of a deck run is *inside* when its plan point lies in the union
+        of `pads.bridge_station_zones` grown by `STATION_SHADOW_M` -- the extent
+        `bareearth.conform` writes into plus the reach `roadgrade.conform`
+        measurably carries that write, so the rule fires where the correction
+        *arrived* rather than where it was written;
+      * a maximal contiguous inside stretch of a run takes a linear
+        interpolation, along the run's own arclength, of the measured ground at
+        the last station outside it at each end;
+      * a stretch with only one outside end -- the run leaves the extent, or the
+        hero-bridge clip cut it inside a zone -- holds that end's ground flat;
+      * a stretch with neither is left alone, because there is nothing to
+        interpolate from.
+
+    **Why the arclength and not the straight-line distance.** A deck run is
+    stationed at `STATION_M` along its own centreline and the Cahill's approach
+    curves through 90 degrees inside the Milsons Point zone; a chord
+    interpolation would put the middle of the curve at the wrong fraction of the
+    fall and leave a kink at one end. The arclength is already computed for the
+    stationing and is the parameter every other quantity on a run uses.
+
+    **Why a node and not a station.** Two runs meeting at a shared coordinate are
+    one unknown -- `_solve`'s `node_id` -- so the substitute has to be per node,
+    and where two runs disagree about a shared node the higher wins. That is the
+    same one-sidedness the whole rule is: the answer may hold a deck up and may
+    never push one down.
+
+    Returns `(ground_or_higher, stats)`. On no zones it returns the argument
+    itself, unchanged and not copied, so a build with no rail bake is bit-for-bit
+    what it was.
+    """
+    if not zones:
+        return ground, {"station_zone_nodes": 0, "station_zone_lifted": 0}
+
+    from shapely import contains_xy
+    from shapely.ops import unary_union
+
+    zone = unary_union([z.zone.buffer(STATION_SHADOW_M) for z in zones])
+    hold = np.full(n_nodes, -np.inf)
+
+    for sp, ids in zip(stations, node_of):
+        if len(sp) < 2:
+            continue
+        inside = np.asarray(contains_xy(zone, sp[:, 0], sp[:, 1]), dtype=bool)
+        if not inside.any():
+            continue
+        s = np.concatenate(([0.0], np.cumsum(np.hypot(*np.diff(sp, axis=0).T))))
+        n = len(sp)
+        k = 0
+        while k < n:
+            if not inside[k]:
+                k += 1
+                continue
+            a = k
+            while k < n and inside[k]:
+                k += 1
+            b = k - 1
+            lo = a - 1 if a > 0 else None
+            hi = b + 1 if b + 1 < n else None
+            if lo is None and hi is None:
+                continue
+            g_lo = float(ground[ids[lo]]) if lo is not None else None
+            g_hi = float(ground[ids[hi]]) if hi is not None else None
+            span = 0.0 if lo is None or hi is None else float(s[hi] - s[lo])
+            for i in range(a, b + 1):
+                if g_lo is None:
+                    g = g_hi
+                elif g_hi is None:
+                    g = g_lo
+                elif span <= 0.0:
+                    g = max(g_lo, g_hi)
+                else:
+                    g = g_lo + (float(s[i]) - float(s[lo])) / span * (g_hi - g_lo)
+                nid = ids[i]
+                hold[nid] = max(hold[nid], g)
+
+    seen = np.isfinite(hold)
+    out = np.where(seen, np.maximum(ground, hold), ground)
+    rise = out - ground
+    lifted = rise > 1e-6
+    stats = {
+        "station_zone_nodes": int(seen.sum()),
+        "station_zone_lifted": int(lifted.sum()),
+        "station_zone_lift_p50_m": float(np.median(rise[lifted])) if lifted.any() else 0.0,
+        "station_zone_lift_max_m": float(rise[lifted].max()) if lifted.any() else 0.0,
+    }
+    return out, stats
 
 
 # --- The crossing demand ---------------------------------------------------------
@@ -1979,4 +2239,57 @@ def verify_decks() -> list[str]:
             f" the {MAX_GRADE:.0%} ceiling ({STATION_M * MAX_GRADE:.2f} m), so this is"
             " no longer a repair for steep runs -- it resamples the whole network"
         )
+
+    failures += _verify_station_zone_ground()
+    return failures
+
+
+def _verify_station_zone_ground() -> list[str]:
+    """The station-zone rule's three claims, on made-up ground.
+
+    Three, and the middle one is the one worth having. It is easy to write a
+    rule that lifts a deck out of a hole and hard to notice that the same rule
+    flattens a real rise, because a rise inside a platform zone looks exactly
+    like a correction to a test that only measures the hole. So the dip and the
+    rise are the same seven stations with the sign of the middle three flipped,
+    and the second must be a no-op to the bit.
+    """
+    from shapely.geometry import box
+
+    class _Zone:
+        def __init__(self, poly):
+            self.zone = poly
+
+    failures: list[str] = []
+    # Seven stations 100 m apart and a 100 m zone in the middle of them, so that
+    # `STATION_SHADOW_M`'s buffer reaches the middle three and no further. The
+    # spacing is deliberate: at `STATION_M` the buffer would swallow every
+    # station and the test would be asserting nothing.
+    sp = np.column_stack((np.arange(7) * 100.0, np.zeros(7)))
+    ids = np.arange(7)
+    zones = [_Zone(box(250.0, -5.0, 350.0, 5.0))]
+
+    # A dip: the bare-earth pass has taken 6 m off the middle. Interpolating
+    # between the two 10 m ends is flat 10, so all three come up.
+    dip = np.array([10.0, 10.0, 4.0, 4.0, 4.0, 10.0, 10.0])
+    out, stats = _station_zone_ground([sp], [ids], dip, 7, zones)
+    if not np.allclose(out, [10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0]):
+        failures.append(f"the station-zone rule did not fill a 6 m dip: {out.tolist()}")
+    if stats["station_zone_lifted"] != 3:
+        failures.append(
+            f"the station-zone rule lifted {stats['station_zone_lifted']} of 3 inside nodes"
+        )
+
+    # A rise, which is a landform and not a correction. One-sided, so nothing moves.
+    rise = np.array([10.0, 10.0, 16.0, 16.0, 16.0, 10.0, 10.0])
+    out, stats = _station_zone_ground([sp], [ids], rise, 7, zones)
+    if not np.array_equal(out, rise) or stats["station_zone_lifted"]:
+        failures.append(
+            f"the station-zone rule flattened a rise inside a zone: {out.tolist()}"
+        )
+
+    # No zones at all: the argument itself, not a copy of it.
+    same = _station_zone_ground([sp], [ids], dip, 7, ())[0]
+    if same is not dip:
+        failures.append("the station-zone rule rebuilt the ground with no zones to read")
     return failures
