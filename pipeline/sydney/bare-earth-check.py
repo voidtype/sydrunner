@@ -263,18 +263,22 @@ def _bake(radius_m: float, field, label: str):
 
 def section_rail(radius_m: float, off, on, bakes: dict) -> list[str]:
     print("\n4. CHATSWOOD -- target: clearance >= +5 m, vertical 'elevated', no conflict")
-    # Said out loud every run, because it is the one thing about these numbers a
-    # reader will otherwise assume wrongly. `rail.build_all(terrain=True)` -- the
-    # shipped `rail-bake` -- loads the DEM **unconformed**: no roads, no water,
-    # no pads, no bare earth. So the bake that ships has never seen rule 1 either,
-    # and `groundY 42.83` in the shipped Chatswood record is the raw terrarium
-    # surface to the centimetre. Both bakes here are run the other way, with the
-    # solved lattice handed in, which `build_all` supports and calls "the one way
-    # to measure this bake against a ground that is not the raw DEM". Until
-    # `build_all`'s default changes, this pass moves the ground the player stands
-    # on and does not move the number the bake reports.
-    print("   both bakes are run with the solved lattice handed to `rail.build_all`;")
-    print("   the shipped `rail-bake` reads the DEM unconformed and sees neither pass.")
+    # This used to say the opposite, and saying it out loud every run is what got
+    # it fixed. `rail.build_all(terrain=True)` -- the shipped `rail-bake` -- used
+    # to load the DEM **unconformed**: no roads, no water, no pads. So the bake
+    # that shipped had never seen rule 1 either, `groundY 42.83` in the shipped
+    # Chatswood record was the raw terrarium surface to the centimetre, and this
+    # module's two bakes were the only ones in the pipeline measuring against the
+    # ground the player stands on.
+    #
+    # RESOLVED 2026-09-10: `build_all` reads the conformed lattice through
+    # `terraincache`, the same call `cli.py` cuts the tiles from. The two bakes
+    # here are still handed a field directly, because that is the only way to
+    # hold one pass off while everything else stays on -- but they are no longer
+    # the exception to how the railway is baked. They are the shipped
+    # arrangement with `bare_earth` flipped.
+    print("   both bakes are run with the solved lattice handed to `rail.build_all`,")
+    print("   which since 2026-09-10 is what the shipped `rail-bake` reads too.")
     zone = next((z for z in pads.bridge_station_zones(radius_m) if z.name == CHATSWOOD), None)
     if zone is None:
         print(f"   Chatswood is not in a {radius_m / 1000:.1f} km extract. Re-run with "

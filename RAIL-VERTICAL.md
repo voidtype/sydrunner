@@ -310,6 +310,122 @@ mismatch is not neutral: `rail-geo` chooses trench, grade or viaduct off the
 bake's profile, so a bake that still measures −3.58 m over ground that has
 dropped would carve a trench into a hole. The one-line change belongs to whoever
 owns `rail.py`; this round did not make it, and it is the next thing to do.
+*(Made the same day — §3c.)*
+
+#### 3c. Amendment, 2026-09-10: the bake reads the ground the player stands on
+
+§3b's last paragraph is this one's brief, and the fix is one line in
+`rail.build_all`: `Terrain.load(radius_m, conform_roads=False,
+conform_water=False, conform_pads=False)` becomes `terraincache.load(radius_m)`,
+which is the identical call `cli.py:561` makes to cut every `.terr.bin`.
+
+**The argument, because "read the conformed lattice" is not self-evidently
+right.** Rule 3.3 above does not say the DEM wins because it is raw. It says the
+DEM wins *"because the DEM **is** the ground we render and the player's feet
+stand on it"*. That clause is the whole authority, and the unconformed drape has
+none of it: nothing in the world is built on it and nobody stands on it. It was a
+fourth opinion about the ground, and the bake was the only reader.
+
+**What the fourth opinion cost, which is not a style point.** Two decisions in
+`world/rail-geo` are taken per span, and they were reading different grounds:
+
+| decision | where the number comes from | which ground |
+|---|---|---|
+| **bore** — `rail-cut.drawnAsTunnel` | `game/rail.deepen`: the bake's own `vertexClearance < −DEEP_M` | the bake's |
+| **trench** — `rail-cut.inTrench` | `rail-geo` PHASE_SEGMENT: `depth = rawGround(x, z) − trackY` | the streamed lattice |
+
+So the railway decided where to bore against one surface and where to dig against
+another. Measured over the 16,481 polyline vertices of a 20 km bake, the two
+disagreed by a median of **0.50 m**, a p95 of **4.19 m** and a maximum of
+**22.85 m**, with **11,024 of them past 0.30 m** — and 52 vertices were the exact
+failure §3b predicted: the bake reading at-or-above grade while the rendered
+ground wanted a trench more than a metre deep. After the change every one of the
+16,510 vertices agrees **to the bit**, because there is one array and one sampler,
+and the holes are **52 → 0**.
+
+**Measured on two 20 km bakes, identical but for the `Terrain` handed in** —
+`before` is the line as it stood, `after` is `terraincache.load`:
+
+| | before | after |
+|---|---|---|
+| station records moved > 0.25 m | — | **104 of 156** |
+| Chatswood `groundY` / `trackY` / `siteY` | 30.72 / 36.22 / 35.68 | 33.50 / 40.24 / 35.68 |
+| Chatswood `clearance`, `vertical` | +5.73, elevated | **+2.26, surface** |
+| Circular Quay `groundY`, `clearance` | −53.35, +13.28 | **−33.84, −6.74** |
+| Milsons Point `groundY`, `clearance` | −33.82, +4.58 | −35.13, **+3.08** |
+| bore vertices (`SPAN_TUNNEL` ∪ deep) | 3,490 | 3,492 |
+| trench vertices | 5,676 | **5,351** |
+| holes | **52** | **0** |
+| structure/ground conflicts | 4 | **2** |
+
+Chatswood's `after` row is §3b's number to the centimetre, which is the check
+that this is the same ground that document measured. Its `before` row is not the
+shipped 60 km bake's (−3.58 m) and the difference is worth its own sentence:
+`Terrain.load` grew a fourth flag, `bare_earth`, defaulting on, and the rail
+bake's call named only three — so for five days the bake read a hybrid nobody
+chose, the raw drape with the built mass deconvolved out of three station zones.
+Taking every default `cli.py` takes is the only spelling of *"the same ground as
+the tiles"* that a new pass cannot silently break.
+
+**Nothing gained a bore.** Six stations lost the word `elevated` (Artarmon,
+Chatswood, Circular Quay, Macdonaldtown, Milsons Point, West Ryde) and none in
+either direction became `underground`. Four crossed the −1 m band into a cutting
+— Circular Quay, Waverton, North Strathfield, Wiley Park — and every one of them
+was **already** under the rendered ground before the change, measured off its own
+old track: +7.86 m, +1.87 m, +1.48 m and +0.29 m of depth that `rail-geo` was
+going to find whatever the bake said. The change reported those holes; it did not
+dig them.
+
+**Circular Quay is the one to look at, and it is rule 2 working.** Its record goes
+from `+13.28 m, elevated, no conflict` to `−6.74 m, surface, conflict recorded` —
+21.14 m of disagreement removed in one line. The Cahill viaduct's deck really is
+under the conformed lattice's surface there, because the CBD DEM reads high by a
+building and `bareearth.roof_cap` **deliberately** declines to correct the Quay
+(§3b: unbounded, the deconvolution wants 15.6 m off it and is unusable). So the
+station is now a station whose OSM structure and whose ground disagree, which is
+exactly the case rule 2 exists to *record rather than obey*. It is a real, open
+defect with a name on it instead of a number that looked fine because two errors
+of opposite sign cancelled.
+
+**`rail-audit` goes from two hand-asserted failures to one, and the one that is
+left must not be edited away.** Run over both 20 km bakes — same `build_all`,
+same `audit`, two `Terrain` objects:
+
+| | before | after |
+|---|---|---|
+| section 3's named station profiles | **2 FAIL**: Milsons Point and Chatswood both came out `elevated`, expected `surface` | **1 FAIL**: Circular Quay came out `surface`, expected `elevated` |
+
+The two it fixes are the two whose expectations already carry the reason in this
+document's own words — *"the DEM is the ground that renders"*. The one it leaves
+is Circular Quay, and the temptation is to change that expectation to `surface`
+the way Chatswood's and Milsons Point's were changed. **Do not.** Those two were
+re-expected because the measurement was right; this one fails because the
+measurement is right *and the world is wrong*. The Quay's ground in this build
+stands 35 m over its own harbour on a terrarium reading that `terrain.py` records
+as ~12 m high in the CBD, and `bareearth.roof_cap` caps the Quay's correction at
+**0.45 m** on purpose (§3b) because the unbounded 15.6 m would take every wharf,
+viaduct and hero landmark with it. So a real viaduct measures 6.74 m under a
+ground that is itself wrong, `rail-audit` says so by name in section 4a, and the
+red is the check doing the job §5 asks of it. Editing the expectation would put
+the silence back. The fix is the terrain at the Quay, or `raw_heights` — not the
+audit.
+
+**What this does not change, stated so nobody looks for it.** A viaduct is still
+`terrain.sample(...) + BRIDGE_RISE` — an offset from the ground beneath it, not a
+structure standing on its own piers — so every metre a conform pass takes off the
+ground, the deck gives up too, and only what the 3.3% grade cone pulls back from
+approaches that did not move survives. That is why Chatswood reads +2.26 and not
++5, and why Circular Quay's deck follows its ground up. §3b's last line stands:
+**the last three metres are `raw_heights`'s.** The fix is a bridge deck solved
+from its abutments, and it is the next thing after this one.
+
+**And the cost.** A conformed 20 km solve is ~6 minutes and a 60 km one the
+better part of three hours, against 5.7 seconds for the raw drape — which was the
+only argument the old line had. It is paid through `terraincache`, keyed on the
+DEM, the extract and the source of every module that shapes the lattice, so a
+`rail-bake` beside a world build is a cache hit in seconds. `rail.py` is in that
+key, so a rail-only edit still costs one fresh solve; `terraincache`'s header
+already took that trade and this makes it slightly worse and still right.
 
 ### 4. Access is generated, never looked up
 

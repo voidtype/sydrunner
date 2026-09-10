@@ -49,6 +49,36 @@
  * interchange development sitting on it -- this check names the day it did.
  *
  * ---------------------------------------------------------------------------
+ * ## Restated 2026-09-10: every fence in section 1 is a clearance
+ *
+ * One of them was not, and it was the one that would have gone off. `siteY >
+ * 38.0` stood here, meaning *"the trains stand at 39.08 m, up from 32.27"* --
+ * an **absolute height above the datum**, which is a fence on where the ground
+ * happens to be and not on anything about the railway. RAIL-VERTICAL.md 3b took
+ * 7.36 m of interchange roof off the ground under this station and
+ * `rail.build_all` now reads the conformed lattice, so the trains correctly come
+ * to stand at about 35.7 m -- and a check written to protect Chatswood would
+ * have failed the round that fixed it.
+ *
+ * What the line was *for* is the two things a reader of the report cares about,
+ * and both of them are differences:
+ *
+ *   * **the deck is not in a hole** -- where the trains actually stand, the
+ *     ground over them is no further above them than the platform median is
+ *     allowed to be. `siteY - siteGroundY`, fenced at the same -4.5 m, because
+ *     the site and the platform are one measurement of one railway and there is
+ *     no reading of "Chatswood is up off the floor" that lets them disagree.
+ *   * **the platform is over the street** -- some of the deck stands above the
+ *     ground beside it, which is what a viaduct over an interchange *is* and
+ *     what "half underground" denied. `clearanceHi > 0`.
+ *
+ * Both survive a datum shift, a bare-earth pass, a road solve and a re-tile,
+ * because a difference of two heights cannot be moved by moving both. The
+ * negative control at the end of section 1 is the other half of that claim: the
+ * same four fences are handed the same station buried ten metres, and every one
+ * of them has to fire, or they are not fences.
+ *
+ * ---------------------------------------------------------------------------
  * ## And the second half, which is the one that matters more
  *
  * A rule that fixes one station by moving fifty is not a fix. `BEFORE` below is
@@ -185,11 +215,44 @@ console.log(
     `trackY ${st.trackY.toFixed(2)}, groundY ${st.groundY.toFixed(2)}, siteY ${st.siteY.toFixed(2)}, ` +
     `structure ${st.structure}, vertical ${st.vertical}`,
 );
-// The measured improvement, fenced. -10.54 was the report; -3.58 is what the
-// portal ceiling leaves, and -0.24 is the ceiling with every tunnel deleted.
-say(st.clearance > -4.5, `the platform sits ${st.clearance.toFixed(2)} m against the terrain, up from -10.54 m before the portal ceiling; the fence is -4.5 m`);
-say(st.clearanceLo > -7.0, `the deep end of the platform is ${st.clearanceLo.toFixed(2)} m, up from -13.27 m; the fence is -7.0 m`);
-say(st.siteY > 38.0, `the trains stand at ${st.siteY.toFixed(2)} m, up from 32.27 m`);
+/**
+ * The four measurements section 1 fences, as one function over a station-shaped
+ * record -- so the negative control below can be handed a broken one and watch
+ * every fence fire. One expression, two readers: a control evaluating a
+ * different rule from the check is a control that has stopped testing it.
+ *
+ * **Every one of them is a difference of two heights**, which is the whole of
+ * the 2026-09-10 restatement in the header. Nothing here reads a height above
+ * the datum, so nothing here moves when the ground does.
+ */
+interface Fenced {
+  clearance: number;
+  clearanceLo: number;
+  clearanceHi: number;
+  siteY: number;
+  siteGroundY: number;
+}
+function fences(s: Fenced): Array<[boolean, string]> {
+  const siteClear = s.siteY - s.siteGroundY;
+  return [
+    // The measured improvement, fenced. -10.54 was the report; -3.58 is what the
+    // portal ceiling leaves, and -0.24 is the ceiling with every tunnel deleted.
+    [above(s.clearance, -4.5), `the platform sits ${s.clearance.toFixed(2)} m against the terrain, up from -10.54 m before the portal ceiling; the fence is -4.5 m`],
+    [above(s.clearanceLo, -7.0), `the deep end of the platform is ${s.clearanceLo.toFixed(2)} m, up from -13.27 m; the fence is -7.0 m`],
+    // Where the trains actually stand, against the ground over them -- not the
+    // absolute 38.0 m this used to be. See the header.
+    [above(siteClear, -4.5), `where the trains stand the ground over them is ${siteClear.toFixed(2)} m away (siteY ${s.siteY.toFixed(2)} under siteGroundY ${s.siteGroundY.toFixed(2)}), up from -10.56 m; the fence is the platform's own -4.5 m`],
+    // Platform over street: a deck over an interchange has some of itself above
+    // the ground beside it, and "half underground" is exactly the denial of that.
+    [above(s.clearanceHi, 0.0), `the high end of the platform stands ${s.clearanceHi.toFixed(2)} m over the ground -- the deck is over the street, not under it; the fence is 0 m`],
+  ];
+}
+/** `a > b` with a NaN reading as a failure rather than as a pass. */
+function above(a: number, b: number): boolean {
+  return Number.isFinite(a) && a > b;
+}
+
+for (const [ok, msg] of fences(st)) say(ok, msg);
 say(st.structure === 'bridge', `OSM still says the structure is a deck (${st.structure}, ${(st.bridgeShare * 100).toFixed(0)}% of the track over 85 m)`);
 say(st.shaftDepth < 4.0, `access is ${st.shaftDepth.toFixed(2)} m of stair rather than the 9.76 m shaft a buried station needed`);
 const lines = [...st.lines].sort().join(',');
@@ -200,7 +263,48 @@ say(
 );
 
 console.log('');
+console.log('--- 1b. NEGATIVE CONTROL: the same four fences over the same station, buried');
+// Ten metres of ground put back over the deck, and nothing else touched. A fence
+// that a buried Chatswood still walks through is not a fence, and after the
+// 2026-09-10 restatement this control is the only thing standing between "every
+// assertion is a difference of two heights" and "every assertion is vacuous":
+// a relative measure is *easier* to satisfy accidentally than an absolute one,
+// because both halves of it move together. Burying the record moves one half.
+const BURY_M = 10.0;
+const buried = {
+  clearance: st.clearance - BURY_M,
+  clearanceLo: st.clearanceLo - BURY_M,
+  clearanceHi: st.clearanceHi - BURY_M,
+  siteY: st.siteY - BURY_M,
+  siteGroundY: st.siteGroundY,
+};
+const survived = fences(buried).filter(([ok]) => ok);
+for (const [ok, msg] of fences(buried)) {
+  console.log(`    ${ok ? 'passed (BAD)' : 'fired  (good)'}  ${msg}`);
+}
+say(
+  survived.length === 0,
+  `all ${fences(buried).length} fences fire on a Chatswood ${BURY_M.toFixed(0)} m under the ground` +
+    (survived.length ? ` -- ${survived.length} did not, and are therefore testing nothing` : ''),
+);
+
+console.log('');
 console.log(`--- 2. Nothing else in Sydney moved (tolerance ${MOVE_TOLERANCE_M.toFixed(1)} m of siteY)`);
+// **This section is a 60 km check and says so.** `BEFORE` is an absolute `siteY`
+// per station, which is the one kind of number the header has just finished
+// arguing a fence must not be -- but here it is a *baseline for a delta*, and a
+// delta of two absolute heights is a difference like any other, so it is sound
+// for as long as it is compared against a bake of the same shape. It is not
+// sound against a scoped bake: a 20 km run has 156 stations against this list's
+// 267, and the 111 absences are the extract's radius rather than anything the
+// railway did. So a bake missing baseline stations reports and does not fail.
+//
+// TO WHOEVER RE-BAKES 60 km ON THE CONFORMED LATTICE FIRST: this list was taken
+// on a bake that read the raw DEM, and `rail.build_all` no longer does. Every
+// station whose ground the road, water, pad or bare-earth passes moved will move
+// with it, and that is the round's result rather than a regression -- re-take
+// the list from the new bake, and put the ones that moved past a metre on
+// `EXPECTED` with the pass that moved them named.
 const now = new Map(bake.stations.map((s) => [s.name, s.siteY]));
 const movers: Array<[string, number, number, number]> = [];
 let missing = 0;
@@ -208,27 +312,36 @@ for (const [name, was] of BEFORE) {
   const isNow = now.get(name);
   if (isNow === undefined) {
     missing++;
-    bad.push(`${name} is in the baseline and not in the bake`);
     continue;
   }
   const d = isNow - was;
   if (Math.abs(d) > MOVE_TOLERANCE_M) movers.push([name, was, isNow, d]);
 }
 movers.sort((a, b) => Math.abs(b[3]) - Math.abs(a[3]));
-say(missing === 0, `all ${BEFORE.length} stations in the baseline are still in the bake`);
-say(bake.stations.length === BEFORE.length, `the bake still has ${BEFORE.length} stations (${bake.stations.length})`);
+const scoped = missing > 0;
+if (scoped) {
+  console.log(
+    `  SCOPED BAKE: ${bake.stations.length} stations against the baseline's ${BEFORE.length}, ` +
+      `${missing} of the baseline absent. This section is the 60 km comparison and is reported, not asserted.`,
+  );
+} else {
+  say(missing === 0, `all ${BEFORE.length} stations in the baseline are still in the bake`);
+  say(bake.stations.length === BEFORE.length, `the bake still has ${BEFORE.length} stations (${bake.stations.length})`);
+}
 console.log(`  ${movers.length} station(s) moved more than ${MOVE_TOLERANCE_M.toFixed(1)} m:`);
 for (const [name, was, isNow, d] of movers) {
   const why = EXPECTED.get(name);
   console.log(
     `    ${name.padEnd(24)} ${was.toFixed(2).padStart(9)} -> ${isNow.toFixed(2).padStart(9)}  ${(d >= 0 ? '+' : '') + d.toFixed(2)} m` +
-      (why ? `   ${why}` : '   *** NOT EXPECTED ***'),
+      (why ? `   ${why}` : `   ${scoped ? '(not on EXPECTED)' : '*** NOT EXPECTED ***'}`),
   );
 }
-const unexpected = movers.filter(([name]) => !EXPECTED.has(name)).map(([name]) => name);
-say(unexpected.length === 0, `every station that moved is one this file names a reason for${unexpected.length ? `: ${unexpected.join(', ')} are not` : ''}`);
-for (const name of EXPECTED.keys()) {
-  say(movers.some(([n]) => n === name), `${name} did move -- an expectation nothing satisfies is a check that has stopped testing anything`);
+if (!scoped) {
+  const unexpected = movers.filter(([name]) => !EXPECTED.has(name)).map(([name]) => name);
+  say(unexpected.length === 0, `every station that moved is one this file names a reason for${unexpected.length ? `: ${unexpected.join(', ')} are not` : ''}`);
+  for (const name of EXPECTED.keys()) {
+    say(movers.some(([n]) => n === name), `${name} did move -- an expectation nothing satisfies is a check that has stopped testing anything`);
+  }
 }
 
 console.log('');
