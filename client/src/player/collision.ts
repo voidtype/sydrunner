@@ -117,6 +117,28 @@ export interface Prism {
    */
   structural: boolean;
   /**
+   * Is this structure lying on the land within a body's reach of it?
+   * `-1` not asked yet, `0` no, `1` yes. See `LOW_DECK_STEP_M` and `lowStepFor`.
+   *
+   * **A cached answer rather than a decoded field, and that is the design.** The
+   * question needs the *terrain*, which `addTile` does not have and must not
+   * wait for: on the server the prisms of a hexagon arrive on a tick long after
+   * the grids, on the browser they arrive after an awaited `TerrainField.ensure`
+   * for their own tile -- but a segment at a tile edge reaches into a neighbour
+   * whose ground may be one fetch behind. Deciding at load would make the answer
+   * depend on arrival order, and arrival order is the one thing the two ends do
+   * *not* share (`resolveCars`' header makes the same argument about a `Map` of
+   * tiles walked in adoption order). Deciding on first use, and only once the
+   * ground answers, makes it depend on the payload and the heightfield alone --
+   * which are byte for byte identical in both processes.
+   *
+   * `-1` costs one integer compare on a hot path and is paid once per prism the
+   * body ever comes near. A sample that answers `NO_GROUND` is **not** cached:
+   * the prism stays a wall for now, exactly as it was before this rule, and is
+   * asked again when the grid lands.
+   */
+  lowStep: number;
+  /**
    * `prismsWithin`'s visit stamp, and nothing else's -- see it for the argument.
    *
    * On the record rather than in a `Set` beside it because a building 15 m
@@ -167,6 +189,64 @@ export const BODY_HEIGHT_M = 1.8;
  * the terrain, shallower than the shallowest station tunnel lid.
  */
 export const UNDER_BUILDING_M = 2;
+
+/**
+ * How far a **structure lying on the land** may stand over the ground under it
+ * before it is a wall rather than a step, metres. See `solidFor`, clause 2b,
+ * and `lowStepFor` for how the ground is found.
+ *
+ * ---------------------------------------------------------------------------
+ * **Why there is a rule here at all.** The owner, on the world published
+ * 2026-09-11: *"the ramp onto the bridge is impassible. many places witch close
+ * road walls are."* `decks.PRISM_MIN_RISE_M` is 0.35 m -- under that rise a deck
+ * segment earns no collision volume, because the terrain is already the floor --
+ * and the bare-earth pass that round took 2.1 m off the ground at Milsons Point
+ * while the Bradfield Highway approach, pinned at its touchdowns, came down only
+ * 1.82 m. A deck that used to lie on its ground at **0.02 m** now floats between
+ * **0.30 and 0.65 m** over it for its whole length, every segment earns a prism,
+ * and every one of those prisms is a wall -- because what a body clears is
+ * `controller.STEP_HEIGHT` (0.42) plus the 0.05 epsilon in `solidFor`'s first
+ * clause, **0.47 m**, and the approach never comes closer to its ground than
+ * 0.50. Three centimetres, and a bridge nobody can walk onto.
+ *
+ * **1.0 m, and it is the girder.** Three numbers were in front of this one and
+ * `server/ramp-check.ts` measured all three against the shipped build:
+ *
+ *   - **0.47**, the budget itself, fixes nothing: the thing being relieved is
+ *     exactly the population that is *over* the budget.
+ *   - **0.80**, `decks.PARAPET_MIN_CLEARANCE_M`, is the line the bake already
+ *     draws between "a piece of road over a pipe" and a structure -- under it no
+ *     barrier is drawn at all, so nothing marks the edge and a body is meant to
+ *     walk across. A principled line, and 0.15 m short of the Milsons Point
+ *     approach's worst segment.
+ *   - **1.00**, `decks.GIRDER_DEPTH_M`, is the depth of the slab itself. A
+ *     structure standing less than its own slab over the land is a piece of
+ *     paving, not a viaduct: there is no soffit to walk under (`WALK_UNDER_M` is
+ *     2.6), no parapet above 0.8 that is not itself a separate prism, and
+ *     nothing in the drawing that reads as an edge. It clears every touchdown in
+ *     the build with room and leaves the thing the owner would miss -- a real
+ *     deck edge, a 1.5 m drop off a viaduct side -- solid.
+ *
+ * Above this the volume keeps every clause it had. This is a floor rule, not a
+ * hole: `roofHeight` is untouched, so a body still *stands on* a relieved deck.
+ * That is the whole difference between this and simply dropping the prism, and
+ * it is why it is the rule and dropping is not -- a ramp with no prism is a ramp
+ * the player wades up knee-deep in its own asphalt, and worse, it moves the wall
+ * one segment further up the run instead of removing it.
+ */
+export const LOW_DECK_STEP_M = 1.0;
+
+/**
+ * How far a low structure's `base` must be **under** the ground before it counts
+ * as lying on the land, metres. See `lowStepFor`.
+ *
+ * `decks.prisms` writes an embankment's base at `ground - 0.5` and a parapet's
+ * at the deck's own top, so the two forms are half a metre apart in one
+ * direction and `PARAPET_MIN_CLEARANCE_M` (0.8 m) in the other. Anything in
+ * between is the sampling disagreeing with itself, and 0.05 m is the same
+ * epsilon every other height question in this file is asked with.
+ */
+const ON_THE_LAND_M = 0.05;
 
 /**
  * The coarse cell a *tile* is filed under, metres. See `tileCells`.
@@ -436,6 +516,16 @@ export class CollisionWorld implements MoveResolver {
    */
   private carSolids: CarSolidSource | null = null;
   /**
+   * The bare terrain under a point, or a non-finite number where no grid has
+   * landed. `null` until a process wires one in. See `setGroundSampler`.
+   *
+   * The **raw heightfield** and deliberately not either end's `groundHeight`:
+   * that one folds in the roofs, and a roof is what this is trying to measure
+   * against. `TerrainField.height` on both ends, over the same `.terr.bin`
+   * bytes, so the two processes get the same float.
+   */
+  private groundSampler: ((x: number, z: number) => number) | null = null;
+  /**
    * The query's own scratch, allocated once. See `resolveCars`.
    *
    * On the world rather than on the call because `resolve` runs once per body
@@ -533,6 +623,7 @@ export class CollisionWorld implements MoveResolver {
         maxX,
         maxZ,
         structural: i < structuralCount,
+        lowStep: -1,
         seen: 0,
         carveStamp: 0,
       };
@@ -796,6 +887,11 @@ export class CollisionWorld implements MoveResolver {
         // `Prism.structural` means and what stops `world/invisible-walls.ts`
         // counting a viaduct as a building.
         structural: true,
+        // The railway builds its own solids and none of them is a deck lying on
+        // the land: a platform, a stair and a viaduct all stand on a base this
+        // file never wrote. Asked lazily like every other prism all the same --
+        // one sample settles it and `lowStepFor` is the only judge there is.
+        lowStep: -1,
         seen: 0,
         carveStamp: 0,
       };
@@ -1070,6 +1166,87 @@ export class CollisionWorld implements MoveResolver {
   }
 
   /**
+   * Wire the bare terrain in, so `LOW_DECK_STEP_M` has a ground to measure
+   * against. One call per process, at construction; `null` takes it out again.
+   *
+   * Without it every structure keeps every clause it had -- `lowStepFor`
+   * answers `false` and caches nothing -- which is what every bare
+   * `CollisionWorld` in the checks and in `verifyCollision` gets and is the
+   * world that shipped. So this is opt-in in the same sense `setCarSolids` is:
+   * two processes call it, `server/world.loadWorld` and `client/src/main.ts`,
+   * both over a `world/terrain.TerrainField` built from the same index and the
+   * same files.
+   *
+   * **It must be wired before the first `resolve`, not before the first
+   * `addTile`.** See `Prism.lowStep`: the answer is cached on first use, so a
+   * sampler installed while the prisms are already resident is still in time,
+   * and one installed after a body has already walked past a deck would leave
+   * that deck's answer stale. Both callers install it at construction, which is
+   * before either.
+   */
+  setGroundSampler(sample: ((x: number, z: number) => number) | null): void {
+    this.groundSampler = sample;
+    // Any cached verdict was reached under the old sampler -- or under none at
+    // all, which is the case this exists for: a world that took its prisms
+    // before its terrain must not keep the "wall" it answered in the meantime.
+    for (const mine of this.tiles.values()) for (const p of mine) p.lowStep = -1;
+  }
+
+  /** Is the terrain wired in? The checks, and `/stats`. */
+  get hasGroundSampler(): boolean {
+    return this.groundSampler !== null;
+  }
+
+  /**
+   * Is this structure a **step** rather than a wall? See `LOW_DECK_STEP_M`.
+   *
+   * Two clauses, and the first one is the whole reason this is safe:
+   *
+   *   1. **Its base is under the ground.** `decks.prisms` writes a deck in one
+   *      of two forms and the choice is in the bytes: with `WALK_UNDER_M` of
+   *      headroom the base is the *soffit*, and below that it is `ground - 0.5`
+   *      and the volume is a solid embankment from under the terrain up to the
+   *      running surface -- which is also how the module *draws* it, with the
+   *      girder clamped to `ground - GIRDER_BURY_M`. So a buried base means a
+   *      deck lying on the land, and it is exactly what a parapet is not: a
+   *      parapet stands on the deck's own top, `PARAPET_MIN_CLEARANCE_M` (0.8 m)
+   *      or more above the ground, and must stay a wall or a player walks off
+   *      the side of a viaduct. A pier is buried (`PIER_BURY_M`, 1.5 m) and is
+   *      caught by clause 2 instead: no pier exists under `PIER_MIN_CLEARANCE_M`
+   *      (2.5 m) of headroom, so no pier is ever within a metre of the ground.
+   *   2. **Its top is between the ground and `LOW_DECK_STEP_M` over it**, and
+   *      the lower half of that is not a formality. `world/rail-geo.ts` hands
+   *      `addPrisms` the railway's own solids -- a platform, a stair, a trench
+   *      wall -- and in a cutting every one of them is **under** the sampled
+   *      DEM, because the heightfield does not model the cutting: at St
+   *      Leonards the grid is eleven metres over the platform. A rule that read
+   *      "within a metre" as a one-sided test would find a platform's whole
+   *      volume comfortably below the ground, call it a kerb, and let a body
+   *      walk through the side of every station in a trench. See
+   *      `server/world.groundFor` on the same eleven metres.
+   *
+   * The sample is at the plan **centre of the bounding box** rather than the
+   * ring's centroid: it is the same point for the convex quad every deck segment
+   * is, it costs four numbers already on the record, and it does not move when a
+   * carve re-orders a ring's vertices -- which matters, because two processes
+   * carve the same prism from corridors that arrived in different orders and
+   * must nevertheless get the same float out of the heightfield.
+   */
+  private lowStepFor(prism: Prism): boolean {
+    if (prism.lowStep >= 0) return prism.lowStep === 1;
+    const sample = this.groundSampler;
+    if (sample === null) return false;
+    const ground = sample((prism.minX + prism.maxX) * 0.5, (prism.minZ + prism.maxZ) * 0.5);
+    // No grid here yet. Not cached: the honest answer is "ask me again", and
+    // until then the prism is the wall it has always been.
+    if (!Number.isFinite(ground)) return false;
+    const over = prism.top - ground;
+    const low = prism.base < ground - ON_THE_LAND_M && over >= 0 && over <= LOW_DECK_STEP_M;
+    prism.lowStep = low ? 1 : 0;
+    return low;
+  }
+
+  /**
    * Slide the capsule out of every car box it is inside. See `resolve`.
    *
    * ---------------------------------------------------------------------------
@@ -1249,6 +1426,11 @@ export class CollisionWorld implements MoveResolver {
    *   2. **Not a structure.** A building is solid from its top to the terrain
    *      whatever its pad says, because its walls are drawn down to the terrain.
    *      See `Prism.structural` for the measurement that settles it.
+   *   2b. **Not a structure lying on the land.** A deck whose base is under the
+   *      ground and whose top is within `LOW_DECK_STEP_M` of it is a step the
+   *      body walks onto rather than a wall it is stopped by. See
+   *      `LOW_DECK_STEP_M` for the ramp onto the Harbour Bridge this is written
+   *      about and `lowStepFor` for why a parapet is not caught by it.
    *   3. **Wholly under the soffit.** Half-open `[base, top)`: a head exactly at
    *      the soffit clears it. This is the line the Cahill, the Western
    *      Distributor and the Harbour Bridge all fall on.
@@ -1284,6 +1466,12 @@ export class CollisionWorld implements MoveResolver {
     // plan-only and would open the tower at street level too, which is the
     // wrong trade for a passage nobody can see from the street.
     if (!prism.structural) return headY > prism.base - UNDER_BUILDING_M;
+    // 2b, and it is the newest clause here. A structure lying on the land within
+    // `LOW_DECK_STEP_M` of it is a *step*, not a wall: the body walks onto it and
+    // `roofHeight` -- untouched, and deliberately so -- hands it the top as its
+    // floor on the very next ground query. See `LOW_DECK_STEP_M` for the owner's
+    // report this answers and `lowStepFor` for how a deck is told from a parapet.
+    if (this.lowStepFor(prism)) return false;
     if (headY <= prism.base) return false;
     if (feetY < prism.base && pointInPolygon(prism.points, fromX, fromZ)) return false;
     return true;
@@ -1433,6 +1621,10 @@ function recordFor(
     maxX,
     maxZ,
     structural: piece.structural,
+    // A carved piece is the same volume over the same ground, so the answer is
+    // the same answer -- but it is re-asked rather than copied, because a carve
+    // moves the plan ring and `lowStepFor` samples at its centroid.
+    lowStep: -1,
     seen: 0,
     carveStamp: stamp,
   };
@@ -2008,6 +2200,212 @@ export function verifyCollision(): string[] {
     if (widened === 0 || diverged === 0) {
       say('The randomised sweep never met an elevated prism; the property proves nothing.');
     }
+  }
+
+  return failures;
+}
+
+/**
+ * The low-deck rule, asserted. Arithmetic only: no world files, no clock, no DOM.
+ *
+ * ---------------------------------------------------------------------------
+ * The arrangement is the Bradfield Highway approach at Milsons Point reduced to
+ * the smallest thing that can tell the right answer from the wrong one, with the
+ * numbers off the shipped payload rather than invented:
+ *
+ *   - a **touchdown** slab whose base is `ground - 0.5` and whose top stands
+ *     **0.50 m** over the ground -- three centimetres past what a body climbs,
+ *     which is the whole of the owner's report;
+ *   - a **viaduct side** built the same way but **1.50 m** up, which is the
+ *     thing that must stay solid and is what decides the threshold;
+ *   - a **parapet** 1.05 m tall standing *on* the touchdown's top, which is
+ *     `decks.PARAPET_HEIGHT_M` exactly, and is the trap: it is inside
+ *     `LOW_DECK_STEP_M` of the ground and must not be relieved, because a
+ *     relieved parapet is a player walking off the edge of a bridge;
+ *   - a **building** of the same height on the same ground, which must not
+ *     change at all -- `Prism.structural` is the only thing that separates them
+ *     and this is where that is proved rather than asserted.
+ *
+ * **The oracle is the same world with the sampler taken out.** `setGroundSampler`
+ * is the one switch, exactly as `setCarSolids(null)` is for the fleets, so "the
+ * world before this rule" is not a second copy of the rule that can drift -- it
+ * is this rule with nothing to measure against, which is by construction the
+ * behaviour that shipped.
+ */
+export function verifyLowDeck(): string[] {
+  const failures: string[] = [];
+  const say = (s: string): void => void failures.push(s);
+
+  /** The land, flat at -36 m, which is Milsons Point to the nearest metre. */
+  const GROUND = -36;
+  const ground = (): number => GROUND;
+
+  // Four volumes, 20 m apart in x so a body walked at one never brushes the
+  // next. Each runs z -20..20 and is approached from the south, across its
+  // z = -20 edge.
+  //
+  //   TOUCHDOWN  a deck lying on the land, top 0.50 m over it. The ramp.
+  //   VIADUCT    the same form 1.50 m up. A real deck edge; must stay solid.
+  //   PARAPET    a 1.05 m barrier standing on the touchdown's own top, down its
+  //              western edge. `decks.PARAPET_HEIGHT_M` exactly.
+  //   TERRACE    a building the same height as the touchdown, on the same
+  //              ground. `Prism.structural` is all that separates them.
+  const TOUCHDOWN = { height: 1.0, base: GROUND - 0.5, points: slab(-6, -20, 6, 20) };
+  const VIADUCT = { height: 2.0, base: GROUND - 0.5, points: slab(14, -20, 26, 20) };
+  const PARAPET = { height: 1.05, base: GROUND + 0.5, points: slab(-6, -20, -5.6, 20) };
+  const TERRACE = { height: 1.0, base: GROUND - 0.5, points: slab(34, -20, 46, 20) };
+  const payload = encodeCheckPayload([TOUCHDOWN, VIADUCT, PARAPET, TERRACE]);
+
+  /** Three structures then one building, which is the payload's own order. */
+  const city = (sampler: ((x: number, z: number) => number) | null): CollisionWorld => {
+    const w = new CollisionWorld();
+    w.setGroundSampler(sampler);
+    w.addTile('t', payload, 0, 0, 1);
+    return w;
+  };
+  const R = 0.34;
+  /** A standing body, the way `controller.step` asks: feet lifted, head not. */
+  const walk = (w: CollisionWorld, fx: number, fz: number, tx: number, tz: number, feet: number) =>
+    w.resolve(fx, fz, tx, tz, R, feet + 0.42, feet + BODY_HEIGHT_M);
+  const reached = (r: { x: number; z: number }, tx: number, tz: number): boolean =>
+    Math.abs(r.x - tx) < 1e-6 && Math.abs(r.z - tz) < 1e-6;
+
+  const before = city(null);
+  const after = city(ground);
+
+  // --- 1. The touchdown. 0.50 m over the ground: a wall before, a step now.
+  {
+    const b = walk(before, 0, -22, 0, -19, GROUND);
+    if (reached(b, 0, -19)) {
+      say(
+        'A 0.50 m touchdown was already walkable with no ground wired in, so the oracle is not ' +
+          'the world that shipped and nothing below this line means anything.',
+      );
+    }
+    const a = walk(after, 0, -22, 0, -19, GROUND);
+    if (!reached(a, 0, -19)) {
+      say(
+        `A body on the ground could not step onto a deck 0.50 m over it: stopped at ` +
+          `(${a.x.toFixed(2)}, ${a.z.toFixed(2)}) short of (0, -19). This is the ramp onto the ` +
+          `Harbour Bridge.`,
+      );
+    }
+    // And it is the floor once it is not a wall, which is the half of the rule
+    // that makes it a *step* rather than a hole.
+    const roof = after.roofHeight(0, 0, GROUND);
+    if (Math.abs(roof - (GROUND + 0.5)) > 1e-6) {
+      say(
+        `roofHeight over a relieved deck answered ${roof.toFixed(2)} rather than its top at ` +
+          `${(GROUND + 0.5).toFixed(2)}. A deck that stops being a wall must not stop being a floor.`,
+      );
+    }
+  }
+
+  // --- 2. The viaduct side. 1.50 m over the ground, and it stays solid.
+  {
+    const a = walk(after, 20, -22, 20, -19, GROUND);
+    if (reached(a, 20, -19)) {
+      say(
+        'A body walked through the side of a viaduct standing 1.50 m over the ground. ' +
+          `LOW_DECK_STEP_M is ${LOW_DECK_STEP_M}; a real deck edge has to stay solid.`,
+      );
+    }
+  }
+
+  // --- 3. The parapet. Inside the threshold measured from the ground, and a
+  //        wall all the same, because it stands on the deck and not on the land.
+  {
+    const b = walk(before, -3, 0, -5.9, 0, GROUND + 0.5);
+    const a = walk(after, -3, 0, -5.9, 0, GROUND + 0.5);
+    if (reached(a, -5.9, 0)) {
+      say(
+        'A body on the deck walked through its parapet. A parapet stands on the deck top, not ' +
+          'under the ground, and `lowStepFor` clause 1 is what is supposed to tell them apart.',
+      );
+    }
+    if (a.x !== b.x || a.z !== b.z || a.hit !== b.hit) {
+      say('The parapet answered differently with the ground wired in. It must not have moved.');
+    }
+  }
+
+  // --- 4. The building. Same height, same ground, and untouched.
+  {
+    const b = walk(before, 40, -22, 40, -19, GROUND);
+    const a = walk(after, 40, -22, 40, -19, GROUND);
+    if (reached(a, 40, -19)) {
+      say(
+        'A body walked into a building 0.50 m over the ground and through it. The rule is for ' +
+          'structures; `Prism.structural` is the only thing that may separate them.',
+      );
+    }
+    if (a.x !== b.x || a.z !== b.z || a.hit !== b.hit) {
+      say('A building answered differently with the ground wired in. Buildings are not decks.');
+    }
+  }
+
+  // --- 4b. A platform in a cutting, which is the case that nearly got away.
+  //
+  //     `world/rail-geo.ts` builds the railway's solids and `addPrisms` files
+  //     them here, and in a trench every one of them is **under** the sampled
+  //     DEM: the heightfield does not model the cutting, so at St Leonards the
+  //     grid is eleven metres over the platform. Both halves of clause 1 are
+  //     satisfied -- the base is under the ground and the top is within a metre
+  //     of it, on the wrong side -- and a one-sided reading would let a body
+  //     walk through the side of every station in a trench.
+  {
+    const w = new CollisionWorld();
+    w.setGroundSampler(ground);
+    // A platform 1.05 m over its rail head, the whole thing 11 m under the DEM.
+    w.addPrisms('rail', [
+      { points: new Float32Array(slab(54, -20, 66, 20)), base: GROUND - 12, height: 1.05 },
+    ]);
+    const a = walk(w, 60, -22, 60, -19, GROUND - 12);
+    if (reached(a, 60, -19)) {
+      say(
+        'A body walked through a platform standing 11 m below the sampled ground. The rule is ' +
+          'for things lying **on** the land; a volume wholly under it is a cutting, not a kerb.',
+      );
+    }
+  }
+
+  // --- 5. No ground, no opinion, and no cached one either. A tile whose terrain
+  //        has not landed keeps the wall it had, and gets the step the moment it
+  //        does -- which is the whole reason the verdict is cached on first use
+  //        rather than decided at `addTile`.
+  {
+    let have = false;
+    const late = new CollisionWorld();
+    late.setGroundSampler((): number => (have ? GROUND : Number.NaN));
+    late.addTile('t', payload, 0, 0, 1);
+    const cold = walk(late, 0, -22, 0, -19, GROUND);
+    if (reached(cold, 0, -19)) {
+      say('A deck was relieved with no terrain under it. NO_GROUND is not an answer.');
+    }
+    have = true;
+    const warm = walk(late, 0, -22, 0, -19, GROUND);
+    if (!reached(warm, 0, -19)) {
+      say(
+        'A deck stayed a wall after its terrain landed. A NO_GROUND sample must not be cached, ' +
+          'or a tile that arrives ahead of its ground is a wall for the life of the session.',
+      );
+    }
+  }
+
+  // --- 6. The switch is a switch. Wiring the sampler in after the prisms are
+  //        resident has to reach them, because `server/world.ts` builds the world
+  //        and the terrain in one pass and the order is not this file's to fix.
+  {
+    const late = city(null);
+    walk(late, 0, -22, 0, -19, GROUND);
+    late.setGroundSampler(ground);
+    const a = walk(late, 0, -22, 0, -19, GROUND);
+    if (!reached(a, 0, -19)) {
+      say(
+        'A sampler wired in after a body had already been resolved never reached the prisms. ' +
+          '`setGroundSampler` has to clear the cached verdicts.',
+      );
+    }
+    if (!late.hasGroundSampler) say('hasGroundSampler answered false with a sampler wired in.');
   }
 
   return failures;
