@@ -297,6 +297,44 @@ leave the client untouched.
 Bridge's own deck is made of. `base` at the soffit puts the volume over a
 player's head so they walk under it; the top is standable through
 `CollisionWorld.roofHeight`. Nothing about the payload changes.
+
+---------------------------------------------------------------------------
+**THE FOURTH BUG, AND THE FIFTH: A RAMP YOU CANNOT GET ONTO, AND A BARRIER
+NOBODY DREW.**
+
+The owner, on the world the third bug's fix shipped in: *"the ramp onto the
+bridge is impassible. many places witch close road walls are."* Two sentences,
+two faults, both of them in `prisms` and both of them the same shape -- a
+collision volume that is taller than anything the player can see.
+
+**The ramp.** A prism has one `base` and one `height`, so a sloping deck is a
+staircase of flat-topped boxes, and `MAX_STEP_M` bounds the step between one box
+and the next. Nothing bounded the *first* step, from the terrain onto the
+staircase, because nothing in the solve has an opinion about it: the touchdown is
+pinned to the asphalt and the clearance takes whatever value the ground under the
+run happens to give it. Where the third bug's fix left the Bradfield Highway
+approach floating 0.50 m over its own ground for 200 m, the first step was 0.50 m
+against the 0.47 m a body climbs, and a bridge became unenterable along its own
+line. `DeckRun.prism_tops` is the answer: a ramp's touchdown **tapers**, two
+sweeps along the run that build a climbable staircase up from the terrain at each
+end and cap it at the deck the moment they catch it. Nothing over
+`LOW_DECK_RISE_M` is touched, because a deck standing more than its own girder
+over the land has an edge and a wall there is right.
+
+**The barrier.** `_emit_run` has always grown a parapet over `PARAPET_RAMP_M`
+from each end of a barrier run -- *"transitions to ramps should not have edges
+like this, should be smooth"*, the owner again, a round earlier -- and `prisms`
+has always written `PARAPET_HEIGHT_M` flat. So the first station of every barrier
+in the city carried a 1.05 m wall standing exactly where the drawing showed
+nothing at all, and the second carried one a third taller than the wedge beside
+it. That is "many places witch close road walls are", and there is one at each
+end of every barrier run in the extent. The profile
+is now `DeckRun.parapet`, one array, read by the tessellator and by the collision,
+and the box for a segment is the lower of its two ends -- inside the wedge rather
+than around it.
+
+Both are asserted arithmetically in `verify_decks`, which `cmd_build` runs before
+it reads a byte.
 """
 
 from __future__ import annotations
@@ -581,6 +619,25 @@ PRISM_MIN_RISE_M = 0.35
 # same top.
 WALK_UNDER_M = 2.6
 
+# The rise over the ground under which an embankment's top is **tapered** rather
+# than left where the deck is, metres. See `DeckRun.prism_tops`.
+#
+# The same 1.0 m as `player/collision.LOW_DECK_STEP_M`, and deliberately the same
+# number: that constant is the runtime rule which says a structure lying within
+# its own slab's depth of the land is a step a body walks onto rather than a wall
+# it is stopped by, and this is the bake making the same statement about the one
+# case the runtime rule cannot reach -- a body arriving **along** the run, at a
+# touchdown, where the thing in front of it is the end face of the embankment
+# rather than its side.
+#
+# Above it nothing is tapered, and that is the whole of why the two numbers are
+# one number. A deck standing more than its own girder over the land has an edge:
+# `PARAPET_MIN_CLEARANCE_M` (0.8 m) has already given it a barrier, the drawing
+# shows a structure, and a wall is the right answer. Below it there is no barrier
+# drawn, no soffit to walk under (`WALK_UNDER_M` is 2.6), and nothing on screen
+# that says the thing is an edge at all.
+LOW_DECK_RISE_M = 1.0
+
 # --- Suppression ---------------------------------------------------------------
 
 # How far past the hero bridge's own plan a generic deck is still suppressed.
@@ -677,6 +734,8 @@ class DeckRun:
     # `prisms` asks for it once per segment, so recomputing it there would be a
     # `_frames` call per six metres of viaduct in the extent.
     _left: np.ndarray | None = field(default=None, repr=False, compare=False)
+    _para: np.ndarray | None = field(default=None, repr=False, compare=False)
+    _tops: np.ndarray | None = field(default=None, repr=False, compare=False)
 
     @property
     def frames(self) -> np.ndarray:
@@ -684,6 +743,140 @@ class DeckRun:
         if self._left is None:
             object.__setattr__(self, "_left", _frames(self.pts))
         return self._left
+
+    @property
+    def parapet(self) -> np.ndarray:
+        """The barrier's height at each station, metres. Zero where none is drawn.
+
+        -----------------------------------------------------------------------
+        **This used to live inside `_emit_run` and be drawn from, while `prisms`
+        wrote `PARAPET_HEIGHT_M` regardless -- so the collision barrier was a full
+        1.05 m box everywhere the drawn one was a wedge growing out of nothing.**
+        The owner's second sentence was *"many places witch close road walls
+        are"*, and the ends of every barrier run in the city are exactly that: a
+        1.05 m wall standing where `PARAPET_RAMP_M` says the drawing shows a
+        kerb, or at the very first station shows nothing at all.
+
+        Zero where the deck is a piece of road over a pipe, full on the span, and
+        grown between the two over `PARAPET_RAMP_M` from whichever end of a
+        barrier run is nearer. One array, asked by the tessellator and by the
+        collision, because two answers to "how tall is this barrier" is how the
+        pair came apart in the first place.
+        """
+        if self._para is not None:
+            return self._para
+        clear = self.clearance
+        n = len(self.deck_y)
+        allowed = np.asarray(
+            [clear[k] >= PARAPET_MIN_CLEARANCE_M for k in range(n)], dtype=bool
+        )
+        step = np.hypot(*np.diff(self.pts, axis=0).T) if n > 1 else np.zeros(0)
+        chain = np.concatenate(([0.0], np.cumsum(step)))
+        para = np.zeros(n)
+        k = 0
+        while k < n:
+            if not allowed[k]:
+                k += 1
+                continue
+            k2 = k
+            while k2 + 1 < n and allowed[k2 + 1]:
+                k2 += 1
+            c0 = chain[k]
+            c1 = chain[k2]
+            for m in range(k, k2 + 1):
+                grow = min(
+                    (chain[m] - c0) / PARAPET_RAMP_M, (c1 - chain[m]) / PARAPET_RAMP_M, 1.0
+                )
+                # A short barrier run grows to what its length allows and no
+                # further; a run under two ramps' worth peaks in the middle.
+                para[m] = PARAPET_HEIGHT_M * max(0.0, grow)
+            k = k2 + 1
+        object.__setattr__(self, "_para", para)
+        return para
+
+    @property
+    def prism_tops(self) -> np.ndarray:
+        """The top of each **segment's** collision prism, tapered at a touchdown.
+
+        -----------------------------------------------------------------------
+        **A ramp's touchdown tapers to the ground instead of presenting its end
+        face as a step.**
+
+        A prism has one `base` and one `height`, so a sloping deck is a staircase
+        of flat-topped boxes whose step `MAX_STEP_M` already bounds -- between one
+        segment and the next. What nothing bounded was the **first** step: from
+        the terrain onto the staircase. That one is `top - ground` at whichever
+        end of the run a body arrives from, and the solve has no opinion about it
+        at all. At Milsons Point the whole Bradfield Highway approach came out
+        floating 0.50 m over its own ground, which is three centimetres past what
+        a body climbs, and the ramp onto the Harbour Bridge became unenterable
+        along its own line.
+
+        So: two sweeps along the run, one from each end, each building a
+        staircase from the terrain at `MAX_STEP_M` a segment and capping it at
+        the deck the moment it catches up. The tighter of the two wins, because a
+        run is entered from either end and both have to work. The floor ends up
+        at most `MAX_STEP_M` over the terrain at the run's ends and back on the
+        drawn deck within two or three segments -- at Milsons Point, 0.15 m below
+        the asphalt for six metres and exact thereafter.
+
+        **Three things it deliberately does not do.**
+
+        It does not taper anything standing more than `LOW_DECK_RISE_M` over its
+        ground: that is a structure with an edge, the bake has already drawn it a
+        parapet, and a wall is the right answer. A sweep that reached those would
+        drop the floor a metre under a viaduct to open a doorway nobody wants.
+
+        It does not taper where no prism is emitted at all, and it treats those
+        segments as having handed the body to the terrain -- which is what they
+        do. A gap in the staircase resets the sweep rather than propagating a
+        height across it.
+
+        And it does not move the **base**, the drawn deck, the girder or the
+        parapet. The parapet in particular keeps sitting on the real deck top, so
+        a tapered segment carries a barrier that floats by the width of the taper
+        -- fifteen centimetres, on a volume nobody can get their head under.
+        Lowering the barrier with the floor would be the bake agreeing with
+        itself about a number the drawing does not use.
+        """
+        if self._tops is not None:
+            return self._tops
+        n = len(self.deck_y)
+        if n < 2:
+            tops = np.zeros(0)
+            object.__setattr__(self, "_tops", tops)
+            return tops
+        top = 0.5 * (self.deck_y[:-1] + self.deck_y[1:])
+        mid = 0.5 * (self.ground[:-1] + self.ground[1:])
+        # The ground a body stands on before it steps up, which is the **lower**
+        # of the segment's two ends: it can arrive from either, and the taller
+        # step is the one that has to be climbable.
+        low = np.minimum(self.ground[:-1], self.ground[1:])
+        rise = top - mid
+        emitted = rise >= PRISM_MIN_RISE_M
+        walk_under = (top - GIRDER_DEPTH_M) - mid >= WALK_UNDER_M
+        free = walk_under | ((top - low) > LOW_DECK_RISE_M)
+
+        def sweep(order) -> np.ndarray:
+            cap = top.copy()
+            reach = -np.inf
+            for i in order:
+                if not emitted[i]:
+                    # No volume here: the terrain is the floor, and that is where
+                    # the next segment's step is measured from.
+                    reach = low[i]
+                    continue
+                if free[i]:
+                    reach = top[i]
+                    continue
+                allow = max(low[i], reach) + MAX_STEP_M
+                cap[i] = min(top[i], allow)
+                reach = cap[i]
+            return cap
+
+        tops = np.minimum(sweep(range(len(top))), sweep(range(len(top) - 1, -1, -1)))
+        object.__setattr__(self, "_tops", tops)
+        return tops
 
     @property
     def length(self) -> float:
@@ -898,17 +1091,33 @@ class DeckNetwork:
         for run, lo, hi in self._index().get(tile_key, []):
             hw = run.half_width
             left = run.frames
+            caps = run.prism_tops
+            para = run.parapet
             for i in range(lo, hi):
-                rise = max(run.clearance[i], run.clearance[i + 1])
-                if rise < PRISM_MIN_RISE_M:
-                    continue
                 top = 0.5 * (run.deck_y[i] + run.deck_y[i + 1])
                 ground = 0.5 * (run.ground[i] + run.ground[i + 1])
+                # **The rise along the run, not the clearance across it.** This
+                # used to be `max(clearance[i], clearance[i + 1])` -- two
+                # measurements taken at the segment's *stations*, either of which
+                # could carry it over the threshold while the volume it actually
+                # writes, a flat box at the midpoint, stands lower. The question
+                # the gate is asking is whether *this prism* would do anything,
+                # so it is asked of this prism.
+                if top - ground < PRISM_MIN_RISE_M:
+                    continue
                 soffit = top - GIRDER_DEPTH_M
                 base = soffit if soffit - ground >= WALK_UNDER_M else ground - 0.5
+                # The taper. Identity except at a touchdown; see `prism_tops`.
+                cap = float(caps[i])
                 ring = _mitred_ring(run.pts, left, i, hw)
-                out.append(Prism(ring, float(base), float(top - base), "deck"))
-                if min(run.clearance[i], run.clearance[i + 1]) >= PARAPET_MIN_CLEARANCE_M:
+                out.append(Prism(ring, float(base), float(cap - base), "deck"))
+                # **The barrier the tessellator actually draws**, and never more
+                # than it: the lower of the segment's two ends, so the box is
+                # inside the wedge rather than around it. Under `MAX_STEP_M` it
+                # is a thing a body steps over anyway and a prism for it is bytes
+                # that can only ever be wrong. See `DeckRun.parapet`.
+                wall = min(float(para[i]), float(para[i + 1]))
+                if wall >= MAX_STEP_M:
                     for side in (1.0, -1.0):
                         off = side * (hw - PARAPET_THICK_M * 0.5)
                         out.append(
@@ -917,7 +1126,7 @@ class DeckNetwork:
                                     run.pts, left, i, PARAPET_THICK_M * 0.5, offset=off
                                 ),
                                 float(top),
-                                PARAPET_HEIGHT_M,
+                                wall,
                                 "parapet",
                             )
                         )
@@ -1989,7 +2198,6 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
     left = run.frames
     hw = run.half_width
     dy = run.deck_y
-    clear = run.clearance
     # The soffit, clamped so an at-grade crossing draws an edge beam instead of
     # burying a metre of girder in the terrain. See `GIRDER_BURY_M`.
     soffit = np.maximum(
@@ -2000,31 +2208,11 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
         p = pts[i] + left[i] * (side * hw)
         return _w(p[0], p[1], y, origin)
 
-    # The parapet's height per station: zero where the deck is a piece of road
-    # over a pipe, full on the span, and grown between the two over
-    # `PARAPET_RAMP_M` from whichever end of a barrier run is nearer. See
-    # that constant.
-    n_st = len(dy)
-    allowed = np.array([clear[k] >= PARAPET_MIN_CLEARANCE_M for k in range(n_st)], dtype=bool)
-    step = np.hypot(*np.diff(pts, axis=0).T) if n_st > 1 else np.zeros(0)
-    chain = np.concatenate(([0.0], np.cumsum(step)))
-    para = np.zeros(n_st)
-    k = 0
-    while k < n_st:
-        if not allowed[k]:
-            k += 1
-            continue
-        k2 = k
-        while k2 + 1 < n_st and allowed[k2 + 1]:
-            k2 += 1
-        c0 = chain[k]
-        c1 = chain[k2]
-        for m in range(k, k2 + 1):
-            grow = min((chain[m] - c0) / PARAPET_RAMP_M, (c1 - chain[m]) / PARAPET_RAMP_M, 1.0)
-            # A short barrier run grows to what its length allows and no
-            # further; a run under two ramps' worth peaks in the middle.
-            para[m] = PARAPET_HEIGHT_M * max(0.0, grow)
-        k = k2 + 1
+    # The parapet's height per station. **`DeckRun.parapet` and not a local
+    # copy**, because `prisms` writes the collision barrier off the same array:
+    # the day those were two computations, the drawn wedge at the foot of every
+    # ramp had a full-height invisible wall standing in it.
+    para = run.parapet
 
     for i in range(lo, hi):
         j = i + 1
@@ -2241,6 +2429,121 @@ def verify_decks() -> list[str]:
         )
 
     failures += _verify_station_zone_ground()
+    failures += _verify_touchdown_taper()
+    failures += _verify_parapet_ramp()
+    return failures
+
+
+def _verify_touchdown_taper() -> list[str]:
+    """The taper's three claims, on made-up ground. See `DeckRun.prism_tops`.
+
+    The failure this exists for is the one the owner reported: *"the ramp onto
+    the bridge is impassible"*, which is a deck standing 0.50 m over its own
+    ground against a 0.47 m step budget, presenting its end face to a body
+    walking up the run. Every wrong version of the fix is invisible -- a taper
+    that reaches a viaduct drops the floor a metre under a bridge, one that runs
+    across a gap carries a height over terrain that is already the floor, and one
+    that sweeps from a single end leaves the other end walled.
+    """
+    failures: list[str] = []
+    n = 11
+    pts = np.column_stack((np.linspace(0.0, 60.0, n), np.zeros(n)))
+    ground = np.zeros(n)
+
+    def tops(deck_y: np.ndarray, g: np.ndarray = ground) -> np.ndarray:
+        return DeckRun(road=None, pts=pts, deck_y=deck_y, ground=g, half_width=5.0).prism_tops
+
+    # --- 1. Milsons Point: level deck, 0.50 m over flat ground for its whole
+    #        length. Every segment earns a prism and the first step must be
+    #        climbable from **either** end.
+    flat = tops(np.full(n, 0.50))
+    if flat.size != n - 1:
+        failures.append(f"prism_tops gave {flat.size} tops for {n - 1} segments")
+    elif flat[0] > MAX_STEP_M + 1e-9 or flat[-1] > MAX_STEP_M + 1e-9:
+        failures.append(
+            f"a deck lying 0.50 m over flat ground presented a {max(flat[0], flat[-1]):.2f} m"
+            f" first step against a {MAX_STEP_M} m budget. This is the ramp onto the"
+            " Harbour Bridge."
+        )
+    elif abs(flat[len(flat) // 2] - 0.50) > 1e-9:
+        failures.append(
+            f"the taper reached the middle of a 60 m run ({flat[len(flat) // 2]:.2f} m,"
+            " deck at 0.50): it is a touchdown rule, not a licence to lower every deck"
+        )
+    else:
+        # And the staircase off the end face is climbable all the way up.
+        rungs = np.diff(np.concatenate(([0.0], flat)))
+        if rungs.max() > MAX_STEP_M + 1e-9:
+            failures.append(
+                f"the tapered staircase had a {rungs.max():.2f} m rung in it"
+            )
+
+    # --- 2. A viaduct. 1.50 m over the ground is an edge, not a ramp, and
+    #        nothing may lower it -- `LOW_DECK_RISE_M` is the line and this is
+    #        the half of it that stops the fix eating the bridges.
+    high = tops(np.full(n, 1.50))
+    if not np.allclose(high, 1.50, atol=1e-9):
+        failures.append(
+            f"a deck 1.50 m over its ground was tapered to {high.min():.2f} m."
+            f" LOW_DECK_RISE_M is {LOW_DECK_RISE_M}; a real deck edge stays solid."
+        )
+
+    # --- 3. A gap resets the sweep. The middle of this run lies on the ground
+    #        and earns no prism at all, so the segments after it are entered from
+    #        the terrain and have to taper again rather than inheriting a height
+    #        across a hole they cannot be walked over.
+    dipped = np.full(n, 0.90)
+    dipped[4:7] = 0.0
+    gap = tops(dipped)
+    resumed = gap[6]
+    if resumed > MAX_STEP_M + 1e-9:
+        failures.append(
+            f"the segment after a gap in the staircase presented a {resumed:.2f} m step:"
+            " a run with no prism hands the body to the terrain and the sweep has to"
+            " start again from it"
+        )
+    return failures
+
+
+def _verify_parapet_ramp() -> list[str]:
+    """The barrier the collision writes is never taller than the one drawn.
+
+    The owner's second sentence was *"many places witch close road walls are"*.
+    `prisms` wrote `PARAPET_HEIGHT_M` at every station a barrier was *allowed*
+    on, while `_emit_run` drew it growing over `PARAPET_RAMP_M` from each end of
+    the run -- so the first station of every barrier in the city had a 1.05 m
+    wall standing where the drawing showed nothing. Both now read
+    `DeckRun.parapet`, and this is that sentence as an assertion.
+    """
+    failures: list[str] = []
+    n = 21
+    pts = np.column_stack((np.linspace(0.0, 120.0, n), np.zeros(n)))
+    ground = np.zeros(n)
+    # Well over `PARAPET_MIN_CLEARANCE_M` for the middle of the run and under it
+    # at both ends, so there is exactly one barrier run with two ramps.
+    deck = np.full(n, 4.0)
+    deck[:3] = 0.4
+    deck[-3:] = 0.4
+    run = DeckRun(road=None, pts=pts, deck_y=deck, ground=ground, half_width=5.0)
+    para = run.parapet
+
+    if para[0] > 1e-9 or para[-1] > 1e-9:
+        failures.append("a barrier was drawn where the deck is a piece of road over a pipe")
+    if abs(para.max() - PARAPET_HEIGHT_M) > 1e-9:
+        failures.append(
+            f"the barrier never reached its full {PARAPET_HEIGHT_M} m ({para.max():.2f} m)"
+        )
+    first = int(np.argmax(para > 0))
+    if para[first] >= PARAPET_HEIGHT_M - 1e-9:
+        failures.append(
+            "the first station of a barrier run is already at full height:"
+            f" PARAPET_RAMP_M is {PARAPET_RAMP_M} and the drawing grows over it"
+        )
+    # And the collision box for the segment at the foot of the ramp is the lower
+    # of its two ends, so it sits inside the wedge rather than around it.
+    wedge = min(float(para[first - 1]), float(para[first]))
+    if wedge > para[first] + 1e-9:
+        failures.append("the collision barrier is taller than the drawn one at a ramp")
     return failures
 
 
