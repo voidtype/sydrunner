@@ -2133,6 +2133,20 @@ export async function loadWorld(
     staticCars, staticCarCapBytes,
   );
   const terrain = new TerrainField(index.terrain.grid, index.tile_size, root);
+  // **And the land, so a deck lying on it is a step rather than a wall.** See
+  // `player/collision.LOW_DECK_STEP_M` for the ramp onto the Harbour Bridge this
+  // opens and `setGroundSampler` for why the bare heightfield rather than
+  // `groundFor(world).groundHeight`: that one folds in the roofs, and the roof
+  // is the thing being measured.
+  //
+  // Wired here rather than beside the prisms because it can be and because the
+  // alternative is an ordering constraint nobody can see: `CollisionWorld` asks
+  // this question **on first use** and not at `addTile` (see `Prism.lowStep`),
+  // so a hexagon of prisms that lands on a tick four minutes after boot gets the
+  // same answer as the tile read in the `Promise.all` below, over the same
+  // grids. `main.ts` makes the identical call over the identical bytes, which is
+  // what stops the browser predicting a wall the authority walks through.
+  collision.setGroundSampler((x, z) => terrain.height(x, z));
   const powerups = new PowerupField();
   const tileOf = new Map<string, { tileX: number; tileZ: number }>();
   const points: PowerupPoint[] = [];

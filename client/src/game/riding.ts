@@ -4648,7 +4648,7 @@ export function verifyStationAccess(): string[] {
       points: new Float32Array([x0, z0, x1, z0, x1, z1, x0, z1]),
       height: 12, base, top: base + 12,
       minX: x0, minZ: z0, maxX: x1, maxZ: z1,
-      structural, seen: 0, carveStamp: 0,
+      structural, lowStep: -1, seen: 0, carveStamp: 0,
     });
     const centre = rect(2468, 1084, 2609, 1201, -27.624);
     const field = (prisms: Prism[]) => ({

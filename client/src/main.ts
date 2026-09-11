@@ -206,7 +206,7 @@ import {
   verifyTrainLightKit,
   type PursuitSource,
 } from './world/nightlights.ts';
-import { CollisionWorld, type Prism } from './player/collision.ts';
+import { CollisionWorld, verifyLowDeck, type Prism } from './player/collision.ts';
 import {
   EYE_HEIGHT,
   PLAYER_RADIUS,
@@ -1355,6 +1355,16 @@ async function main(): Promise<void> {
   // order-independence of the push; `verifyMovementBasis` above owns the
   // geometry, because the step that meets a car lives in the controller.
   const carSolidFailures = timed('car solids', verifyCarSolids);
+  // --- The low-deck rule, and it fails in this list's own shape: a ramp you
+  // cannot walk up renders perfectly. The owner's report was *"the ramp onto the
+  // bridge is impassible"*, the cause was a deck standing 0.50 m over its ground
+  // against a 0.47 m step budget, and every wrong version of the fix also draws
+  // a clean frame -- a threshold that relieves a parapet walks the player off
+  // the side of a viaduct, one that relieves a building opens every terrace on a
+  // hill, and one that decides at load instead of on first use gives two
+  // processes two different walls depending on which file landed first. See
+  // `player/collision.LOW_DECK_STEP_M`.
+  const lowDeckFailures = timed('low decks', verifyLowDeck);
   // --- WORKSTREAM AL. What the traffic sounds like, and every failure in it is
   // silent in the sense this list means: the game runs, the cars move, and the
   // audio is subtly wrong in a way nobody can screenshot. A pitch curve that is
@@ -1852,6 +1862,7 @@ async function main(): Promise<void> {
     staticCarFailures.length ||
     drivenCarFailures.length ||
     carSolidFailures.length ||
+    lowDeckFailures.length ||
     carSoundFailures.length ||
     cityBedFailures.length ||
     carSmokeFailures.length ||
@@ -1956,6 +1967,7 @@ async function main(): Promise<void> {
           ...staticCarFailures,
           ...drivenCarFailures,
           ...carSolidFailures,
+          ...lowDeckFailures,
           ...carSoundFailures,
           ...cityBedFailures,
           ...carSmokeFailures,
@@ -5266,6 +5278,24 @@ async function main(): Promise<void> {
    * the exact failure the paragraph above describes, in a third place.
    */
   const rawGroundAt = (x: number, z: number): number => streamer.ground?.height(x, z) ?? NO_GROUND;
+
+  /**
+   * **And the land, handed to the prisms.** See
+   * `player/collision.LOW_DECK_STEP_M`: a deck lying within a metre of the
+   * ground under it is a step the body walks onto rather than a wall, and the
+   * only thing that can tell a deck from a parapet is the ground.
+   *
+   * `rawGroundAt` and not `groundHeightAt`, for the first of the two reasons
+   * that function has just finished giving: the answer wanted here is the bare
+   * heightfield, `NO_GROUND` and all. A fallback to `lastGround` would measure a
+   * deck in the Rocks against ground the player last stood on at Milsons Point,
+   * and `lowStepFor` would cache the nonsense; a non-finite sample is refused
+   * and re-asked when the grid lands, which is what `TerrainField`'s own
+   * sentinel is for. **`server/world.loadWorld` makes the identical call over
+   * the identical `TerrainField`**, which is what stops this end predicting a
+   * wall the authority walks through.
+   */
+  collision.setGroundSampler(rawGroundAt);
 
   /**
    * Sweep the corridor near the player, and hand the rim to the ground.

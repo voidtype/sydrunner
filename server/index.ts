@@ -132,6 +132,7 @@ import { verifyStationLayouts } from '../client/src/world/station-layouts.ts';
 import { verifyPlatformSpine } from '../client/src/world/platform-spine.ts';
 import { verifyRailLateral } from './rail-lateral.ts';
 import { verifyMovementBasis } from '../client/src/player/controller.ts';
+import { verifyLowDeck } from '../client/src/player/collision.ts';
 // WORKSTREAM O (feel): the one breath both viewmodels apply. Three-free, which is
 // why it can be run here at all -- `verifyBat` and `verifyFootyBall` cannot be,
 // because they build geometry. See the entry in the list below.
@@ -621,6 +622,13 @@ const ROOM_BASE = Number(process.env.SYDNEY_ROOM_BASE ?? 0);
     // player who rubber-bands along a kerb row. `verifyMovementBasis` below owns
     // the geometry.
     ['verifyCarSolids', verifyCarSolids()],
+    // And the low-deck rule beside it, for the reason every shared arithmetic
+    // check is run twice: **the two ends have to answer the same wall.** A deck
+    // relieved here and solid in the browser is a player predicted into a ramp
+    // the authority walks them up, which arrives as a rubber-band on the one
+    // piece of road this was written to open. The owner's report was *"the ramp
+    // onto the bridge is impassible"*; see `player/collision.LOW_DECK_STEP_M`.
+    ['verifyLowDeck', verifyLowDeck()],
     // And what a car is called. The server never says it -- the hero line is the
     // browser's -- but the table it is said from is three-free on purpose, and
     // the property that matters is arithmetic rather than pictorial: the label

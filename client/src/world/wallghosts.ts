@@ -448,6 +448,7 @@ export function verifyWallGhosts(): string[] {
     maxX: 4,
     maxZ: 4,
     structural: false,
+    lowStep: -1,
     seen: 0,
     carveStamp: 0,
   });
