@@ -816,6 +816,265 @@ says otherwise.
   all re-run at 5.3 km against this branch and all three still PASS**, gate and
   all, the way §3d re-ran the first two.
 
+#### 3f. Amendment, 2026-09-12: the projection learns how much the error is worth
+
+§3e taught the projection that the DSM's error has a sign. **It did not teach it a
+size, and the 60 km world it shipped is the bill.** `relax_down` is a fixpoint of
+`h_i <- min(h_i, h_j + limit)` and nothing in it remembers where a violation came
+from: a post the shore rule pulled down eleven metres is believed, every post tied
+to it is pulled to the grade limit, every post tied to *those* likewise, out to
+`MAX_SWEEPS` — four kilometres of road — and no term anywhere asks how much
+evidence is being spent. §3e's own sentence, *a post whose height is already known
+pulls its neighbours down along the grade limit*, was missing its second half: **by
+how much.**
+
+Round three against round two: 11,095 terrain tiles differ, nothing is raised,
+and the deepest drops are not the harbour.
+
+| place | tile | round two | round three | deepest post |
+|---|---|---|---|---|
+| **Coledale / Scarborough**, the Illawarra escarpment | `-48_-95` | 58.85 | **42.77** | **−27.13 m** |
+| Manly | `15_31` | 66.74 | **50.90** | −18.97 |
+| Kirribilli | `-1_6` | 69.45 | **62.02** | −14.25 |
+| Brooklyn, on the Hawkesbury | `10_71` | 69.46 | **62.98** | −10.47 |
+| Cronulla | `-10_-42` | 17.40 | 15.85 | −3.46 |
+| Penrith, on the Nepean | `-98_27` | 23.28 | 22.60 | −2.26 |
+| *the Quay, which is the intended result* | — | 29.91 | **18.14** | −17.61 |
+
+The Illawarra is the proof that this is a defect and not a strong opinion.
+Coledale is a village on an escarpment above the sea with **no towers in it**, so
+`bareearth.py`'s own estimator says the DSM there is reading real ground — and the
+projection took sixteen metres off the median post of its tile anyway, on the
+strength of a correction made at a waterline a hundred metres below. What
+separates that from the CBD's twenty metres is not distance from water. It is
+whether anybody measured anything that would pay for the drop.
+
+**Two of the report's six do not reproduce, and it is recorded rather than
+dropped.** Penrith's deepest post moved 2.26 m between these rounds and Cronulla's
+3.46 m, against the 8.7 and 6.8 the regression report quoted; the solved lattice
+and the shipped `.terr.bin` agree on the smaller numbers, so those two were
+measured against something else. They stay named in the check.
+
+**The fix is the term that was missing, and it is a size.**
+
+>     budget_i = BOUND_TOL_M + max( built_i , max_j ( metres_j − BOUND_DECAY·d_ij ) )
+>     floor_i  = sym_i − budget_i
+>     out      = relax_down( max( mixture , relax_up( min(floor, h) ) ) )
+
+In words, which is the brief read back: *a trusted post may pull a neighbour down
+by no more than the evidence it carries — its own correction, decaying along the
+run, or the neighbour's own built mass — and never past that below the answer the
+symmetric projection would have given.*
+
+**The floor is relative to `sym`, and that is the one design decision here.** An
+absolute floor — *never below this post's bare-earth estimate* — is the tempting
+form and it is wrong, because a road is allowed to cut into a hill: the grade
+clamp takes a crest down by whatever 15% costs it and that is a cutting, not an
+error. `sym` is what this module said before it learned about signs, so a floor at
+`sym − budget` binds on exactly the thing the budget is about — how far the
+one-sidedness took a node past where the even-handed operator would have left it
+— and is inert everywhere else. On a steep street inland with no evidence within
+reach the budget is `BOUND_TOL_M`, the answer is already `sym`, and the floor
+never touches it. `min(floor, h)` is not a detail either: **a floor may stop a
+node falling and may never lift one.**
+
+**Every invariant §3e published survives, word for word.**
+
+- `low <= out <= sym`, node by node. `floor <= sym − BOUND_TOL_M` and `sym` is
+  feasible, so `relax_up(min(floor, h)) <= relax_up(sym) = sym`; the mixture is
+  already `<= sym`; and a downward relax of something `<= sym` is `<= sym`. So
+  **nothing in Sydney is ever raised by this change** still holds, and
+  `roadgrade-sign-check.py`'s gate is untouched. The bound spends the
+  one-sidedness back toward the average and can never spend past it.
+- Every edge still obeys its budget: `relax_up(min(floor, h))` is feasible by
+  construction, so the last downward relax is a projection of a feasible-bounded
+  field.
+- With no evidence anywhere it is the symmetric answer **bit for bit**, by the
+  same early return. `Terrain.load(one_sided=False)` is unchanged.
+
+**What counts as evidence is what §3e already measured, kept in metres.**
+`GroundEvidence` normalised both signals into a confidence in [0, 1] and threw the
+size away; it now keeps them. `m` is metres an earlier pass took off this post, or
+the built mass standing on it, shore-weighted exactly as the confidence is — what
+a chain spends as it travels. `b` is the deconvolution's built mass **unweighted**
+— this post's own answer to how far below the DSM the ground could be, owing
+nothing to any chain. Nothing new is computed for either; they are the arguments
+`Terrain.load` and `shoreline.conform` were already handing this object.
+
+**The two constants are knobs, and saying so is the point.** §3e's sweep found its
+constants were not — the Quay did not move across a factor of eight — because that
+operator's work is done by a relax that either binds or does not. This one is
+different and the sweep says so in its first two rows. Every row is a full 5.3 km
+solve, one-sided, shore on; `off` is `BOUND_TOL_M` at a billion, which is this
+operator switched off, and it reproduces §3e's published column exactly.
+
+| decay | tol | N820 | Quay stn | Kirribilli | Town Hall | ridge | 'Loo | bound |
+|---|---|---|---|---|---|---|---|---|
+| 0.05 | off | 15.18 | 20.36 | 65.18 | 68.48 | 45.16 | 5.10 | 0 |
+| **0.05** | **2.0** | **15.36** | **20.63** | **74.29** | 69.62 | 46.72 | 5.13 | 401 |
+| 0.05 | 1.0 | 15.95 | 21.02 | 74.66 | 69.62 | 46.87 | 5.18 | 1,087 |
+| 0.05 | 4.0 | 15.18 | 20.36 | 72.29 | 69.61 | 46.33 | 5.10 | 20 |
+| 0.02 | 2.0 | 15.18 | 20.36 | 69.21 | 69.12 | 45.81 | 5.10 | 0 |
+| 0.10 | 2.0 | **22.64** | **26.10** | 74.29 | 69.62 | 46.72 | 5.14 | 690 |
+
+*(the symmetric answer is 26.42 / 30.56 / 74.47 / 69.62 / 46.91 / 6.77.)*
+
+`BOUND_DECAY` is **0.05 m of budget per metre of run**, and the rows either side
+are the two ways to be wrong. At **0.10** the budget dies in half the distance and
+the Quay goes back to 22.64 — the bound has started eating the correction it
+exists to protect, because the CBD ground that depends on the shore's evidence is
+further from it than the evidence now travels. At **0.02** the budget reaches
+575 m, further than anything in this pipeline has measured anything, and
+Kirribilli only comes back to 69.21 of the 74.47 it should. The answer is fixed by
+a distance that is already a constant here: an 11.5 m correction — the shore
+pass's write at the Quay — carries **230 m at 0.05**, which is
+`shoreline.SHORE_REACH_M`. **Evidence reaches exactly as far past the band as the
+band is wide.** It is also `roadgrade.OPENING_M`'s note on how wide DSM
+contamination actually is, *"150–250 m across"*, read as a distance instead of as
+a filter length.
+
+`BOUND_TOL_M` is **2.0 m**: what a node may lose with no evidence at all, which is
+this module's own noise floor — `solve`'s `drop_p95` on the 60 km world is 1.95 m
+and `conform`'s `moved_p95` is the same order. The rows either side cost what a
+tolerance costs: 4.0 leaves the Quay untouched to the centimetre and gives up two
+metres of Kirribilli; 1.0 takes the last half-metre of Kirribilli and costs the
+Quay 0.77 m. The middle row's cost at the Quay is **0.18 m on an eleven-metre
+correction**.
+
+**The Kings Cross escarpment gets safer, not more dangerous.** Its relief is
+40.14 m symmetric, 40.06 unbounded and **41.59 bounded** — Woolloomooloo is inside
+the shore band and keeps its evidence, while the ridge above it stops paying for a
+correction nobody measured up there. A bound whose job is to stop the projection
+flattening landform should move that number in that direction.
+
+**The gate is a lattice diff at the world's own radius, and it could not have been
+anything else.** §3e was proved on the 5.3 km ring because the Quay is in it and
+the Quay is where the truth is written down. Coledale is fifty-three kilometres
+south of Town Hall, Brooklyn forty north, Penrith forty-five west; the ring that
+proved the sign contains none of them. Every number in §3e is true and the world
+it shipped was still wrong. `roadgrade.TIE_RADIUS_M`'s block says why in as many
+words — a tie chain is transitive and reaches the whole city — so an operator that
+fires through one has no extent and no scoped ring can contain its consequences.
+
+What is assertable instead is a **budget per place**, and the place is a 3 km
+cell, six tiles on a side:
+
+> no cell further than 3 km from Circular Quay may drop more than **8 m** against
+> round two.
+
+The exemption is stated rather than buried: the CBD's twenty metres and the Quay's
+ten **are** the intended result, they are what §3d and §3e were for, and an
+assertion that convicted them would be an assertion against the last two rounds.
+Everything outside that band is ground nobody has claimed a correction for.
+`pipeline/sydney/roadgrade-bound-check.py` is the file, and **it convicts round
+three on eleven cells before it clears this one** — which is the shape a gate
+should have and the thing §3e's gate could not do.
+
+**The 60 km solve.** One, 28.0 minutes, peak RSS 4.38 GB, written into the shared
+`data/cache/terrain-solve` under the key the committed sources produce:
+
+> `342878b6b6449c58621c3e195271d01b2538679052de6093ed905d1d2b0fb9b3`
+
+The solved profile is unchanged where it should be — 196,714 ways, 2,966,785
+nodes, grade p50 1.39% / p95 6.59% / **max 15.000%, 0 edges over `MAX_GRADE`**,
+`drop_p95` 1.94 m. The floor bound **6,607 nodes** directly, by up to 31.25 m,
+and the one-sidedness still lowered **57,183** nodes against round three's 57,242
+— the bound spends a little of the operator back, not the operator.
+
+**The places, m AHD, median over the tile.**
+
+| place | tile | round two | round three | **now** | round 3 vs 2 | now vs 2 |
+|---|---|---|---|---|---|---|
+| Coledale | `-48_-95` | 58.85 | 42.77 | **57.18** | −16.08 | **−1.67** |
+| Coledale | `-48_-94` | 91.76 | 84.53 | **91.61** | −7.23 | **−0.15** |
+| Coledale | `-49_-95` | 139.31 | 138.00 | **139.31** | −1.31 | **−0.00** |
+| Manly | `15_31` | 66.74 | 50.90 | **63.94** | −15.84 | **−2.80** |
+| Manly | `15_32` | 27.37 | 21.16 | **25.10** | −6.21 | **−2.27** |
+| Kirribilli | `-1_6` | 69.45 | 62.02 | **68.08** | −7.43 | **−1.37** |
+| Brooklyn | `10_71` | 69.46 | 62.98 | **68.60** | −6.48 | **−0.86** |
+| Cronulla | `-10_-42` | 17.40 | 15.85 | 15.85 | −1.55 | −1.55 |
+| Penrith | `-98_27` | 23.28 | 22.60 | 22.60 | −0.68 | −0.68 |
+| **the Quay** | — | 29.91 | **18.14** | **18.14** | −11.77 | **−11.77** |
+
+The Quay is unchanged to the centimetre and Coledale is back inside two metres of
+where round two had it. Cronulla and Penrith do not move because nothing moved
+them: the bound only gives back what the one-sidedness took, and at those two it
+took nothing.
+
+**The cells, 3 km on a side, deepest drop against round two.**
+
+| cell | km from the Quay | round three | **now** | posts past 5 m |
+|---|---|---|---|---|
+| E −22.5 N −46.5 (Coledale) | 52.5 | −27.13 | **−6.23** | 366 → **94** |
+| E −25.5 N −46.5 | 53.8 | −25.39 | **−3.26** | 92 → **0** |
+| E +7.5 N +16.5 (Manly) | 17.3 | −19.03 | **−8.42** | 495 → **163** |
+| E −1.5 N +4.5 (Kirribilli) | 4.0 | −14.25 | **−5.60** | 234 → **8** |
+| E +4.5 N +34.5 (Brooklyn) | 34.0 | −10.47 | **−6.56** | 202 → **19** |
+| E +7.5 N +25.5 | 25.8 | −9.04 | **−4.62** | 198 → **0** |
+| E +4.5 N +37.5 | 36.9 | −8.53 | **−1.00** | 6 → **0** |
+| *E −1.5 N +1.5 (the CBD)* | *1.8* | *−21.65* | *−16.84* | *1,050 → 730* |
+
+**Cells outside the harbour band past 8 m: eleven, then three.** The whole
+lattice's deepest drop against round two goes **−27.13 → −17.04 m**, and the
+deepest is now inside the CBD where it belongs.
+
+**The three that are left are not this operator's**, and the check says so with
+the measurement rather than with an excuse. They are E −19.5 N +4.5 and N +7.5 on
+the Parramatta River at 8.68 and 8.40 m — **bit-identical to round three, moved
+0.000 m by this round** — and Manly's cell at 8.42, down from 19.03. Sixteen posts
+are responsible between them and every one is **11 to 152 m from tidal water**,
+inside `shoreline.SHORE_REACH_M`'s own 250 m band. That is the shore pass's
+write, floored at its own `natural − built_drop` and gated by its own passing
+check; this file gates a projection whose defect was having no extent at all. So
+the assertion is made per post on ground the shore rule did not write, the strict
+count is printed beside it, and **nothing this projection reached is over the
+budget**.
+
+**The Quay's gain, which this round was not allowed to give back** (m AHD, round
+three → now): N860 7.41 → 7.46, N820 15.24 → **15.43**, N780 16.49 → 16.88, N700
+23.69 → 24.28, N680 24.88 → 25.47; Circular Quay's station ground **20.36 →
+20.63**. The largest is 0.59 m, against a `QUAY_BUDGET_M` of 2.0 and a correction
+of eleven and a half metres.
+
+**The four 5.3 km gates were re-run against this branch and all four PASS** —
+`roadgrade-sign-check.py` (which is §3e's own gate, arithmetic and all),
+`shoreline-check.py`, `bare-earth-check.py`, `terrain-rules-check.py`. The sign
+check's own headline numbers under the bound: median kept / written **1.10**
+(symmetric 0.41), every transect station closer to what is there, not one post
+raised by the road pass, `MAX_GRADE` still a guarantee, and
+`road-grade-audit`'s centreline half still better than symmetric — 13 carriageways
+over 15% of grade against 18, and 25 over 15% of bank against 36.
+
+
+**What this does not fix, and what it costs.**
+
+- **It does not correct anything.** Like §3e's operator it decides how much of
+  somebody else's correction survives, and it now decides that more strictly.
+  Outside `shoreline.SHORE_REACH_M` nobody has rasterised a built mass, so the
+  budget out there is `BOUND_TOL_M` and nothing else — which makes every inland
+  town centre in the extent a place where this pipeline now *knows* it cannot
+  correct the ground, rather than one where it corrected it by accident through a
+  tie chain from the harbour. That is the right failure, and it makes
+  `terrain.py`'s standing city-wide deconvolution more urgent, not less.
+- **Town Hall gives back its 1.14 m.** §3e recorded that move against ~11 m of
+  known error and was explicit that it was not the deconvolution arriving under
+  another name; it was a tie chain from the shore reaching 666 m inland with
+  nothing to pay for the last stretch, and it reads 69.62 again — the symmetric
+  answer. Nothing was lost that anybody had measured.
+- **Sydney Tower stops moving, which §3e asked for.** That section flagged
+  `base_y` −1.83 m on a pad 585 m from mapped water as *"a hero moving and
+  `landmark-audit` at 20 km has not been run for it"*. It is **−0.26 m** now. Luna
+  Park keeps its −0.97 (reclaimed foreshore, inside the band, evidence of its
+  own), the Opera House is still identical to the millimetre, and the Harbour
+  Bridge's `ramp_north_clearance_m` is still 9.935 → 10.698.
+- **Every terrain cache entry is invalidated**, `roadgrade.py` being in
+  `terraincache._CODE_FILES` — the price that file's header states for an edit
+  here. The 60 km solve for this round is in the shared cache under the key named
+  above, so the retile that follows hits it instead of paying for it again.
+- **No retile, no bake, no 20 km anything.** `landmark-audit` and `rail-audit` at
+  20 km were not run, and `roadgrade-sign-check.py --radius 20000` — which is what
+  would turn Circular Quay's clearance band into a number — was not either.
+
 ### 4. Access is generated, never looked up
 
 Every failure of reachability came from treating access as *content* — build it

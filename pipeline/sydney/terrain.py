@@ -838,6 +838,19 @@ def _bilinear(grid: np.ndarray, x, y):
 # has no correction of its own to make in the middle of the CBD, where nothing
 # has yet told the ground anything.
 #
+# UPDATE 2026-09-12: that fix was right about the sign and silent about the size,
+# and the 60 km world it shipped took up to 27 m off the Illawarra escarpment --
+# cliff-top villages with no towers in them, where this deconvolution says the
+# DSM is reading real ground and the projection pulled them down anyway. The
+# missing term is in `roadgrade.py`'s `--- The bound on the projection ---` block
+# and RAIL-VERTICAL.md section 3f: a chain may now only spend the metres somebody
+# measured. **It makes this note's follow-up more urgent, not less.** The budget
+# outside the shore band is `BOUND_TOL_M` and nothing else, because outside that
+# band nobody has rasterised a built mass -- so every inland town centre in the
+# extent is now explicitly a place where this pipeline knows it cannot correct
+# the ground rather than one where it corrects it by accident. The city-wide
+# deconvolution is what turns that from a fence into an answer.
+#
 # UPDATE: the *worst* consequence of it has since been dealt with separately, and
 # it is worth being clear about which. The contamination made the roads unusable
 # -- a tower footprint next to true ground is a 45 degree facet and the road drapes
