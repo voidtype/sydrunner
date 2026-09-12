@@ -5808,6 +5808,11 @@ if (only === 'police') {
   for (const f of failures) say(`  - ${f}`);
   say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
   process.exit(failures.length === 0 ? 0 : 1);
+} else if (only === 'wildlife') {
+  await checkWildlife();
+  for (const f of failures) say(`  - ${f}`);
+  say(failures.length === 0 ? 'SECTION PASSED' : `${failures.length} CHECK(S) FAILED`);
+  process.exit(failures.length === 0 ? 0 : 1);
 }
 await main();
 
@@ -9567,6 +9572,7 @@ async function checkWildlife(): Promise<void> {
           dt: 1 / 60,
           collision: null,
           groundHeight: () => 0,
+          roads: null,
           peds: null,
           combatants: [victim],
           field,
@@ -10054,6 +10060,7 @@ async function checkWildlife(): Promise<void> {
       dt: 1 / 60,
       collision: world.collision,
       groundHeight: (x: number, z: number, feet: number) => probeWorld.groundHeight(x, z, feet),
+      roads: world.roads ?? null,
       peds: world.peds,
       combatants: [suspect],
       field,
