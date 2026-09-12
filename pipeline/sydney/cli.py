@@ -595,14 +595,50 @@ def cmd_build(args: argparse.Namespace) -> int:
     roads = osm.read_roads(stage.radius_m)
     print(f"    {len(roads):,} ways")
 
+    # The landmarks themselves, which need the terrain: a pylon stands on the
+    # ground at Dawes Point, the Opera House podium is cut into Bennelong Point,
+    # and Sydney Tower's published 309 m is measured from the footpath outside
+    # Westfield rather than from any datum.
+    print("  building the hero landmarks ...")
+    marks = landmarks.build_all(terrain, anchors)
+    landmark_prisms = landmarks.prisms_by_tile(marks)
+    _report_landmarks(marks, terrain)
+
+    # The elevated roads. After the terrain and after the landmarks, and it needs
+    # both: a deck's touchdown height is read straight off the *conformed*
+    # ground, and every bridge centreline is clipped against the hero Harbour
+    # Bridge's own plan first so a generic deck cannot stand inside the authored
+    # one. See `decks.py`.
+    #
+    # **And before the elevated pass**, which is the ordering `elevated._decide`'s
+    # fourth rung is made of. A way tagged `bridge` says a structure carries it
+    # and says nothing about whether there is any air under it at the metre it
+    # crosses a roof; the solve is the only thing in the build that knows, and a
+    # cut has to happen before the tile bucketing below because it moves a
+    # centroid. Those two facts have exactly one order between them and this is
+    # it. Neither this nor the landmarks reads a building, so the move costs
+    # nothing else.
+    print("  solving the bridge decks ...")
+    deck_network = decks.DeckNetwork.load(
+        stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones), roads
+    )
+    _report_decks(deck_network)
+
     # Which footprints do not start at the ground -- bridges, elevated walkways,
-    # and the ML blobs that swallowed a footbridge and walled a road with it.
+    # and the ML blobs that swallowed a footbridge and walled a road with it --
+    # and which ones a solved deck lies through on the ground.
     # **Before the tile bucketing below and after the terrain**, and it has to be
     # both: a derived soffit is measured off the ground, and cutting the arm off
     # a footprint moves its centroid, which is what `Building.tile` is. See
     # `elevated.py` for the rule and for why the drop is asymmetric.
     print("  resolving elevated structures ...")
-    buildings, elevated_report = elevated.resolve(buildings, roads, terrain)
+    buildings, elevated_report = elevated.resolve(
+        buildings,
+        roads,
+        terrain,
+        deck_network,
+        [p for ps in (landmark_prisms or {}).values() for p in ps],
+    )
     _report_elevated(elevated_report)
 
     # The railway, in plan, read off the bake. Two passes need it and both are
@@ -620,15 +656,6 @@ def cmd_build(args: argparse.Namespace) -> int:
     for b in buildings:
         by_tile[b.tile].append(b)
 
-    # And the landmarks themselves, which need the terrain: a pylon stands on the
-    # ground at Dawes Point, the Opera House podium is cut into Bennelong Point,
-    # and Sydney Tower's published 309 m is measured from the footpath outside
-    # Westfield rather than from any datum.
-    print("  building the hero landmarks ...")
-    marks = landmarks.build_all(terrain, anchors)
-    landmark_prisms = landmarks.prisms_by_tile(marks)
-    _report_landmarks(marks, terrain)
-
     # Only the grounded footprints are handed over as obstacles, and that is the
     # last of the elevated pass's ground-level exclusions. The street network
     # subtracts every footprint it is given out of the paved footpath band
@@ -643,23 +670,14 @@ def cmd_build(args: argparse.Namespace) -> int:
     )
     print(f"    {len(street_network):,} surface ways")
 
-    # The elevated roads. After the terrain and after the landmarks, and it needs
-    # both: a deck's touchdown height is read straight off the *conformed*
-    # ground, and every bridge centreline is clipped against the hero Harbour
-    # Bridge's own plan first so a generic deck cannot stand inside the authored
-    # one. See `decks.py`.
-    print("  solving the bridge decks ...")
-    deck_network = decks.DeckNetwork.load(
-        stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones), roads
-    )
-    _report_decks(deck_network)
-
     # And the other half of the same seam: a footprint that stands up into one
-    # of those decks. It has to be here and it cannot be inside `elevated.resolve`
-    # -- the deck profile does not exist until the line above has run. A height
-    # is not a plan quantity, so the bucketing done above and every keep-out
-    # derived from a footprint stay exactly what they were; everything that reads
-    # a height after this point reads the capped one. See `elevated.py`'s header.
+    # of those decks. `elevated.resolve` above has already cut the ribbon out of
+    # everything it could -- a cut moves a centroid, so it had to happen before
+    # the bucketing -- and what is left for this pass is the gentler repair a
+    # height allows and the bucketing does not forbid. A height is not a plan
+    # quantity, so the bucketing done above and every keep-out derived from a
+    # footprint stay exactly what they were; everything that reads a height after
+    # this point reads the capped one. See `elevated.py`'s header.
     print("  capping the buildings under a deck ...")
     cap_report = elevated.cap_under_decks(
         buildings,
@@ -1110,7 +1128,7 @@ def _report_elevated(r: elevated.ElevatedReport) -> None:
         ("stated a base", r.stated),
         ("declared a bridge", r.declared),
         ("raised as a crossing", r.raised),
-        ("cut clear of the road", r.cut),
+        ("cut clear of the road, or of a deck lying through it", r.cut),
         ("dropped", r.dropped),
         ("left grounded (stated base unusable, spans nothing)", r.quirks),
     ):
