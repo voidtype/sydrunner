@@ -2776,6 +2776,11 @@ def cmd_water_audit(args: argparse.Namespace) -> int:
     # when it finally met some. Four synthetic cases, then the real linework at
     # whatever radius was asked for.
     bad_rule = water.verify_polygonise()
+    # And the indexed shore distance against the unindexed one it stands in for.
+    # Same argument as the sampler below: everything about the bed and the shore
+    # band is read through it, and `_chop` is the kind of change that is right or
+    # silently a metre out. Synthetic linework, milliseconds, no extract.
+    bad_rule += water.verify_shore_distance()
     radius = args.coastline_radius or index["radius_m"]
     bad_rule += water.verify_coastline(radius)
     # The creeks ride this sidecar and this audit, because they *are* water sheets

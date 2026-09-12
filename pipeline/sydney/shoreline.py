@@ -258,6 +258,36 @@ from . import bareearth, config, geo, terrain
 # p95 1.86%, max 14.94% -- against a band whose p95 grade was already 19.98%.
 SHORE_REACH_M = 250.0
 
+# --- How much of the city is held in memory at once ----------------------------
+#
+# **Neither of these decides a single output value, and that is the point.** The
+# two sweeps below are elementwise over a raster and over the lattice, so a block
+# of any size gives the same numbers as the whole thing in one bite; what the
+# block size buys is that the whole thing is never in one bite.
+#
+# It had to be bought. This pass shipped vectorised over the entire extent at
+# once, which is right at 5.3 km and fatal at 60: `built_drop` built a shapely
+# `Point` for every pixel of its window -- 59 M of them at 60 km, a 7,680 x 7,680
+# raster, and a GEOS point is not eight bytes -- and `conform` built one for
+# every post of a 3,873 x 3,873 lattice on top of that. The round-three build
+# entered "reading the terrain" at 21:26 and was killed with SIGKILL at 04:24,
+# having written no tile and no cache entry.
+#
+# Time was the larger half and it is the other reason for the blocks. At 20 km
+# the one whole-lattice `_shore_distance` call took **275 s** and the whole-raster
+# one in `built_drop` had not returned after **70 minutes**; the coastline the
+# 60 km extent hands them is several times longer again. The skips below, with
+# `water._chop` behind them, are what make that a few minutes instead.
+#
+# 256 raster pixels is ~4 km of coast a block and 65,536 points of GEOS at a
+# time; a 128-post block is the same 4 km on the lattice, which is the scale that
+# lets a `SHORE_REACH_M` band skip whole inland blocks instead of whole rows.
+# 262,144 posts is the flat chunk the second sweep writes in. All three are small
+# enough that the transient never shows against the rasters this pass must hold.
+_RASTER_BLOCK = 256
+_POST_BLOCK_SIDE = 128
+_POST_BLOCK = 262144
+
 # The height a promenade stands over the water it fronts, metres AHD.
 #
 # Three in life at Circular Quay and three to four at the Opera House forecourt,
@@ -343,6 +373,29 @@ def built_drop(radius_m: float, zoom: int, geom: BaseGeometry, band_m: float):
     inside the band, because the band is grown by that margin before the mask
     is taken.
 
+    **The raster is swept a `_RASTER_BLOCK` square at a time and two whole-block
+    skips carry the 60 km extent.** Both are exact -- they decide where a number
+    is *computed*, never what it is -- and the block is the unit because the
+    thing being skipped is the construction of a GEOS point per pixel:
+
+      * **No waterline within `band_m + m` of the block's own bounding box.**
+        Then no pixel in it is within reach either, so `near` is uniform over the
+        block -- and it is uniformly *inside* or uniformly *outside* the water,
+        because a boundary that does not come within reach of the box does not
+        cross it, so one corner says which. Out at sea past the band and inland
+        past it, this is the whole extent.
+      * **No footprint within the block.** `built_mass` is a maximum over the
+        footprints a subsample point falls in, so a block no polygon reaches
+        carries exactly zero mass and the `SUBSAMPLE**2` point-in-polygon tests
+        that would prove it are the ones worth not running. At 60 km the band
+        includes every pixel of open ocean inside the extent -- `near` is set
+        inside the water, by design -- and that is about 26 M pixels and 420 M
+        subsample tests of empty sea.
+
+    `near` itself is reported unchanged (`band_pixels` in the stats and thence in
+    `ShoreRecord`), so the skips are invisible to the gate as well as to the
+    lattice.
+
     Returns `(drop, origin_px)` -- the raster and its global pixel origin, ready
     for `terrain._bilinear`.
     """
@@ -353,39 +406,83 @@ def built_drop(radius_m: float, zoom: int, geom: BaseGeometry, band_m: float):
     raw, origin_px = bareearth._fetch_raw(
         (-radius_m - m, -radius_m - m, radius_m + m, radius_m + m), zoom
     )
-    east, north = bareearth._pixel_enu(raw.shape, origin_px, zoom, 1)
-    dist = water_module._shore_distance(
-        shapely.points(east.ravel(), north.ravel()), geom.boundary, band_m + m, True
-    )
-    near = np.isfinite(dist).reshape(raw.shape)
-    near |= shapely.contains_xy(geom, east, north)
+    reach = band_m + m
 
     buildings = osm.read_buildings(radius_m)
     polys = [shapely.Polygon(b.ring) for b in buildings]
     heights = np.array([bareearth._height(b) for b in buildings], dtype=np.float64)
+    btree = shapely.STRtree(polys) if polys else None
 
+    # The boundary's own index, built once and kept across the blocks rather
+    # than rebuilt inside `water._shore_distance` for each of them. Only the hit
+    # *set* is wanted here -- `near` is `isfinite(dist)` and nothing reads the
+    # distance -- so the query stops at the tree and no distance is computed at
+    # all. The set is exactly the set the whole-raster call produced.
+    shore = water_module.ShoreIndex(geom.boundary)
+
+    # A subsample point sits within +/- 0.5 px of its pixel's centre and the
+    # block box below is the box of the centres, so the footprint query is asked
+    # about a box two pixels wider on every side. Over-asking costs a block that
+    # turns out to carry no mass; under-asking would lose a real one.
+    pad = 2.0 * terrain._metres_per_pixel(config.ORIGIN_LAT, zoom)
+
+    sub = bareearth.SUBSAMPLE
+    off = (np.arange(sub) + 0.5) / sub
+    du, dv = np.meshgrid(off, off)
+    n_tot = float(terrain.TERRARIUM_PIXELS << zoom)
+
+    near = np.zeros(raw.shape, dtype=bool)
     mass = np.zeros(raw.shape, dtype=np.float32)
-    rows, cols = np.where(near)
-    if len(rows) and polys:
-        sub = bareearth.SUBSAMPLE
-        off = (np.arange(sub) + 0.5) / sub
-        du, dv = np.meshgrid(off, off)
-        n_tot = float(terrain.TERRARIUM_PIXELS << zoom)
-        xx = cols[:, None, None] + du[None, :, :]
-        yy = rows[:, None, None] + dv[None, :, :]
-        lon = (xx + origin_px[0]) / n_tot * 360.0 - 180.0
-        lat = np.degrees(np.arctan(np.sinh(np.pi * (1.0 - 2.0 * (yy + origin_px[1]) / n_tot))))
-        se, sn = geo.lonlat_to_enu(lon.ravel(), lat.ravel())
-        flat = np.zeros(se.size, dtype=np.float64)
-        pi, bi = shapely.STRtree(polys).query(shapely.points(se, sn), predicate="intersects")
-        if len(pi):
-            np.maximum.at(flat, pi, heights[bi])
-        mass[rows, cols] = flat.reshape(len(rows), sub * sub).mean(axis=1).astype(np.float32)
+    h_px, w_px = raw.shape
+    for r0 in range(0, h_px, _RASTER_BLOCK):
+        r1 = min(r0 + _RASTER_BLOCK, h_px)
+        for c0 in range(0, w_px, _RASTER_BLOCK):
+            c1 = min(c0 + _RASTER_BLOCK, w_px)
+            east, north = bareearth._pixel_enu_block((r0, r1, c0, c1), origin_px, zoom)
+            e_lo, e_hi = float(east.min()), float(east.max())
+            n_lo, n_hi = float(north.min()), float(north.max())
+            # Padded for the reason `conform`'s own skip is: strictly containing
+            # the block's pixel centres keeps the test conservative, and keeps
+            # the box off the degenerate case where a raster's last block is one
+            # pixel wide and `shapely.box` of a point answers no to everything.
+            box = shapely.box(e_lo - pad, n_lo - pad, e_hi + pad, n_hi + pad)
+
+            if shore.near_any(box, reach):
+                blk = np.zeros(east.size, dtype=bool)
+                blk[shore.within(shapely.points(east.ravel(), north.ravel()), reach)] = True
+                blk = blk.reshape(east.shape) | shapely.contains_xy(geom, east, north)
+            elif shapely.contains_xy(geom, e_lo, n_lo):
+                blk = np.ones(east.shape, dtype=bool)
+            else:
+                continue  # no band and, being past the band, no mass worth having
+            near[r0:r1, c0:c1] = blk
+
+            if btree is None or not blk.any():
+                continue
+            if not len(btree.query(box, predicate="intersects")):
+                continue  # no footprint reaches this block: the mass here is zero
+            rows, cols = np.nonzero(blk)
+            rows = rows + r0
+            cols = cols + c0
+            xx = cols[:, None, None] + du[None, :, :]
+            yy = rows[:, None, None] + dv[None, :, :]
+            lon = (xx + origin_px[0]) / n_tot * 360.0 - 180.0
+            lat = np.degrees(np.arctan(np.sinh(np.pi * (1.0 - 2.0 * (yy + origin_px[1]) / n_tot))))
+            se, sn = geo.lonlat_to_enu(lon.ravel(), lat.ravel())
+            flat = np.zeros(se.size, dtype=np.float64)
+            pi, bi = btree.query(shapely.points(se, sn), predicate="intersects")
+            if len(pi):
+                np.maximum.at(flat, pi, heights[bi])
+            mass[rows, cols] = flat.reshape(len(rows), sub * sub).mean(axis=1).astype(np.float32)
+
+    del polys, btree, shore, buildings
 
     sigma = terrain.SMOOTH_SIGMA_M / terrain._metres_per_pixel(config.ORIGIN_LAT, zoom)
     natural = ndimage.gaussian_filter(raw, sigma, mode="nearest")
     corrected = ndimage.gaussian_filter(raw - bareearth.BUILT_COEFF * mass, sigma, mode="nearest")
+    del raw, mass
     drop = np.clip(natural - corrected, 0.0, None)
+    del natural, corrected
     return drop, origin_px, int(near.sum()), float(drop.max())
 
 
@@ -422,13 +519,21 @@ def conform(
     this module needs nothing from that one, exactly as `roadgrade.conform` and
     `water.conform` do.
 
-    Post-major and vectorised over the whole lattice at once, which is
-    `water.conform`'s shape and right for the same reason: the geometry is a
-    handful of very large polygons and the posts are millions. The distance is
-    `water._shore_distance` unchanged -- an STRtree over the boundary's parts,
-    `+inf` past the reach -- so a post outside the band pays a logarithmic query
-    and nothing else, and the two modules cannot disagree about how far from the
-    water a post is.
+    Post-major, which is `water.conform`'s shape and right for the same reason:
+    the geometry is a handful of very large polygons and the posts are millions.
+    The distance is `water._shore_distance` unchanged -- an STRtree over the
+    boundary's parts, `+inf` past the reach -- so a post outside the band pays a
+    logarithmic query and nothing else, and the two modules cannot disagree about
+    how far from the water a post is.
+
+    **Two sweeps over blocks of the lattice, not one pass over all of it.** The
+    first finds the band and its distances, the second writes; `built_drop` runs
+    between them, so the extent-wide raster it returns is never alive at the same
+    time as a lattice-wide array of anything. The blocks are `_POST_BLOCK_SIDE`
+    and its note argues them; nothing about the numbers changes, and the order
+    the band is accumulated in is the lattice's own row-major order so that the
+    flat mask `GroundEvidence.built` takes still names this band's population in
+    this band's order.
 
     **`evidence`, when it is given, is a `roadgrade.GroundEvidence`** and this
     pass reports two of its own numbers into it: the deconvolved built mass at
@@ -445,41 +550,124 @@ def conform(
     if geom is None:
         return {"posts": int(heights.size), "moved": 0, "skipped": "no tidal water"}
 
-    q_n, p_n = heights.shape
-    east = (np.arange(p_n) + p0) * spacing
-    north = (np.arange(q_n) + q0) * spacing
-    grid_e = np.repeat(east[None, :], q_n, axis=0).ravel()
-    grid_n = np.repeat(north[:, None], p_n, axis=1).ravel()
-
     from . import water as water_module
 
-    dist = water_module._shore_distance(
-        shapely.points(grid_e, grid_n), geom.boundary, SHORE_REACH_M, True
-    )
-    # Inside the water is distance zero, not distance-to-boundary: a post under
-    # a wharf that the DSM reads at twelve metres is as wrong as the promenade
-    # beside it, and `water.conform` will cut its bed afterwards either way.
-    dist = np.where(shapely.contains_xy(geom, grid_e, grid_n), 0.0, dist)
-    band = np.isfinite(dist)
+    q_n, p_n = heights.shape
+    n_posts = q_n * p_n
+
+    # --- Sweep one: who is in the band, and how far from the water -------------
+    #
+    # A block of rows at a time, and inside it a block of columns, so the order
+    # the band is filled in is the lattice's own row-major order and `band_dist`
+    # below is exactly the population `np.flatnonzero(band)` would name. That
+    # ordering is not cosmetic: `GroundEvidence.built` takes the band as a flat
+    # mask and its two arrays "in its order", and the stats' percentiles are over
+    # the same population.
+    #
+    # The whole-block skip is `built_drop`'s, for the same reason and with the
+    # same proof: a boundary that comes no closer than `SHORE_REACH_M` to the
+    # block's bounding box leaves every post in it outside the band, and cannot
+    # cross the box, so one corner decides whether the block is water or land.
+    # At 60 km that is the great majority of a 121 x 121 km lattice.
+    # One index for the whole sweep, for `built_drop`'s reason: a box tested
+    # against a ring that spans the extent is a walk of the whole ring, and
+    # rebuilding the index per block would be that walk a few hundred times over.
+    shore = water_module.ShoreIndex(geom.boundary)
+
+    band = np.zeros(n_posts, dtype=bool)
+    band_dist: list[np.ndarray] = []
+    side = _POST_BLOCK_SIDE
+    for q0i in range(0, q_n, side):
+        q1i = min(q0i + side, q_n)
+        d_rows = np.full((q1i - q0i, p_n), np.inf)
+        for p0i in range(0, p_n, side):
+            p1i = min(p0i + side, p_n)
+            ge = np.repeat(((np.arange(p0i, p1i) + p0) * spacing)[None, :], q1i - q0i, axis=0)
+            gn = np.repeat(((np.arange(q0i, q1i) + q0) * spacing)[:, None], p1i - p0i, axis=1)
+            e_lo, e_hi = float(ge.min()), float(ge.max())
+            n_lo, n_hi = float(gn.min()), float(gn.max())
+            # Half a post of slack on every side. It keeps the test conservative
+            # -- a box that strictly contains the block's posts can only name
+            # more blocks, never fewer -- and it keeps the box **non-degenerate**,
+            # which is not a nicety: a lattice side of 385 posts against a block
+            # of 128 leaves a last block one post wide, `shapely.box` of a single
+            # point is a zero-area polygon, and GEOS' `dwithin` says no to it
+            # whatever is beside it. That dropped exactly one post at 5.3 km --
+            # the lattice's own far corner, which sits on the clipped water's
+            # boundary at distance zero -- and it cost nothing visible because
+            # the post moved zero metres. It would have cost something the first
+            # time a radius put a real shore in the last column.
+            slack = 0.5 * spacing
+            if not shore.near_any(
+                shapely.box(e_lo - slack, n_lo - slack, e_hi + slack, n_hi + slack),
+                SHORE_REACH_M,
+            ):
+                # Past the reach of every waterline: uniformly inside or out.
+                if shapely.contains_xy(geom, e_lo, n_lo):
+                    d_rows[:, p0i:p1i] = 0.0
+                continue
+            ge = ge.ravel()
+            gn = gn.ravel()
+            d = water_module._shore_distance(
+                shapely.points(ge, gn), geom.boundary, SHORE_REACH_M, True, index=shore
+            )
+            # Inside the water is distance zero, not distance-to-boundary: a post
+            # under a wharf that the DSM reads at twelve metres is as wrong as the
+            # promenade beside it, and `water.conform` will cut its bed afterwards
+            # either way.
+            d = np.where(shapely.contains_xy(geom, ge, gn), 0.0, d)
+            d_rows[:, p0i:p1i] = d.reshape(q1i - q0i, p1i - p0i)
+        m = np.isfinite(d_rows).ravel()
+        band[q0i * p_n : q1i * p_n] = m
+        if m.any():
+            band_dist.append(d_rows.ravel()[m])
+        del d_rows
+    del shore
+
     if not band.any():
         return {"posts": int(heights.size), "moved": 0, "skipped": "no post near tidal water"}
+    dist = np.concatenate(band_dist)
+    del band_dist
 
     drop_r, origin_px, band_px, drop_max = built_drop(radius_m, zoom, geom, SHORE_REACH_M)
-    lon, lat = geo.enu_to_lonlat(grid_e[band], grid_n[band])
-    px, py = terrain._lonlat_to_pixel(lon, lat, zoom)
-    bd = np.asarray(
-        terrain._bilinear(drop_r, px - origin_px[0], py - origin_px[1]), dtype=np.float64
-    )
 
-    flat = heights.reshape(-1).astype(np.float64)
-    natural = flat[band]
-    w = weight(dist[band], SHORE_REACH_M)
-    pulled = natural + w * ((sea + PROMENADE_AHD) - natural)
-    new = np.minimum(natural, np.maximum(pulled, natural - bd))
+    # --- Sweep two: the write, over the band's posts only ----------------------
+    idx = np.flatnonzero(band)
+    bd_all: list[np.ndarray] = []
+    w_all: list[np.ndarray] = []
+    moved_hit: list[np.ndarray] = []
+    n_moved = n_pull = n_floor = 0
+    moved_max = 0.0
+    for a in range(0, idx.size, _POST_BLOCK):
+        b = min(a + _POST_BLOCK, idx.size)
+        sel = idx[a:b]
+        qi, pi_ = np.divmod(sel, p_n)
+        ge = (pi_ + p0) * spacing
+        gn = (qi + q0) * spacing
+        lon, lat = geo.enu_to_lonlat(ge, gn)
+        px, py = terrain._lonlat_to_pixel(lon, lat, zoom)
+        bd = np.asarray(
+            terrain._bilinear(drop_r, px - origin_px[0], py - origin_px[1]), dtype=np.float64
+        )
+        natural = heights[qi, pi_].astype(np.float64)
+        w = weight(dist[a:b], SHORE_REACH_M)
+        pulled = natural + w * ((sea + PROMENADE_AHD) - natural)
+        new = np.minimum(natural, np.maximum(pulled, natural - bd))
+        moved = natural - new
+        heights[qi, pi_] = new.astype(heights.dtype)
 
-    moved = natural - new
-    flat[band] = new
-    heights[:] = flat.reshape(heights.shape).astype(heights.dtype)
+        hit = moved > 0.0
+        n_moved += int(hit.sum())
+        n_pull += int((hit & (new >= natural - bd - 1e-9) & (new <= pulled + 1e-9)).sum())
+        n_floor += int((hit & (new > pulled + 1e-9)).sum())
+        if moved.size:
+            moved_max = max(moved_max, float(moved.max()))
+        if hit.any():
+            moved_hit.append(moved[hit])
+        if evidence is not None:
+            bd_all.append(bd)
+            w_all.append(w)
+    del drop_r, dist, idx
 
     if evidence is not None:
         # The two numbers the `min`/`max` above was already made of, handed on
@@ -487,18 +675,20 @@ def conform(
         # much building is the DSM looking at here" and `w` is how much of a
         # shore this post is; the road solve's projection reads them as the
         # confidence that the error it is about to clamp has a sign.
-        evidence.built(band, bd, w)
+        evidence.built(band, np.concatenate(bd_all), np.concatenate(w_all))
+    del bd_all, w_all
 
-    hit = moved > 0.0
+    moved = np.concatenate(moved_hit) if moved_hit else np.zeros(0)
+    del moved_hit
     stats = {
         "posts": int(heights.size),
         "in_band": int(band.sum()),
-        "moved": int(hit.sum()),
-        "p50": float(np.percentile(moved[hit], 50)) if hit.any() else 0.0,
-        "p95": float(np.percentile(moved[hit], 95)) if hit.any() else 0.0,
-        "max": float(moved.max()) if moved.size else 0.0,
-        "pull_bound": int((hit & (new >= natural - bd - 1e-9) & (new <= pulled + 1e-9)).sum()),
-        "floor_bound": int((hit & (new > pulled + 1e-9)).sum()),
+        "moved": n_moved,
+        "p50": float(np.percentile(moved, 50)) if moved.size else 0.0,
+        "p95": float(np.percentile(moved, 95)) if moved.size else 0.0,
+        "max": moved_max,
+        "pull_bound": n_pull,
+        "floor_bound": n_floor,
         "band_pixels": int(band_px),
         "built_drop_max": round(drop_max, 3),
         "reach_m": SHORE_REACH_M,
