@@ -238,13 +238,141 @@ collision rings and this measures the source rings, and a rule that fired at
 exactly the threshold it is trying to clear would leave pairs standing on
 5 mm of rounding.
 
-**It runs after the deck solve and mutates in place**, which is the only place
-it can: the deck profile does not exist until `decks.DeckNetwork.load` has run,
-and `cli.cmd_build` has by then bucketed the same `Building` objects by tile. A
-height is not a plan quantity, so nothing already derived -- the tile a building
-belongs to, the footpath its footprint was subtracted from, the bays and poles
-that dodged it -- can move; and everything that reads a height afterwards, the
-tile mesh, the collision prism and `far.bin`, reads the capped one.
+**It runs after the tile bucketing and mutates a height and nothing else**,
+which is what makes it safe there: a height is not a plan quantity, so nothing
+already derived -- the tile a building belongs to, the footpath its footprint
+was subtracted from, the bays and poles that dodged it -- can move, and
+everything that reads a height afterwards, the tile mesh, the collision prism
+and `far.bin`, reads the capped one. What it cannot do from there is change a
+*plan*, and that is the whole of the next section.
+
+---------------------------------------------------------------------------
+**THE 49 REFUSALS, AND THE RUNG THEY WERE OWED: A BUILDING A DECK LIES
+*THROUGH* IS CUT.**
+
+The census above ends with a defect named out loud -- *49 refused because the
+deck is on the ground through a real building* -- and `cap_under_decks`' own
+report says whose work it is: `_decide`'s cut ladder. Every one of them is a
+roof drawn through a touchdown ramp: the Cahill's Upper Pitt Street approach at
+362 m2 inside one footprint, Fitzroy Street at 93 m2, James Craig Road eight
+times over. Every one of them is a building with a road *through* it, which is
+the sentence this module's first three rungs are made of -- and every one was
+refused because the only two verbs available after the tile bucketing are
+"lower a roof" and "delete", and a road through a building asks for neither.
+
+**What was stopping it was one filter, and the filter is right.** `resolve`'s
+`centre_lines` index drops `r.bridge`, and that is correct for the bug it was
+written for: this index is the carriageways a footprint may not stand on the
+ground *across*, the word doing the work is **ground**, and a bridge way is a
+road in the air. A rule that read a bridge centreline here would find every
+building a flyover passes over "spanning a road" -- and every one of those is
+`near_bridge`-corroborated by construction, because the flyover's own way lies
+on it -- so branch 3 would put a real terrace to the crossing question and
+*lift it into the air on a 5.4 m soffit*. That is not a hypothetical:
+`_verify_resolve`'s `under` case is exactly it, and with its viaduct way moved
+into `centre_lines` as though it were at grade the building comes back raised
+to a 5.4 m base with 4.6 m of roof left on it. This module's own bug, committed
+with the storeys the other way up. The filter stays, and there is a test on it
+now.
+
+**But the bridge way was the wrong thing to have asked in the first place.**
+`bridge=yes` says a structure carries this road. It says nothing about whether,
+at the metre where that road crosses this roof, there is any air under it --
+and there is 5.4 m of it over a flyover and none at all over a touchdown ramp,
+an approach embankment or a span over a culvert, which are the crossings that
+make this defect. The one thing in the build that knows the difference is the
+deck solve, which has already decided station by station whether the prism it
+writes is a soffit over the player's head or an embankment under their feet
+(`decks.prisms`, against `decks.WALK_UNDER_M`). So the fourth rung asks the
+solved deck and never the way, which is what "considering bridge ways" has to
+mean here if it is not to mean the paragraph above.
+
+The rule:
+
+  **Where a solved deck's solid stands in the same band as a footprint's, and
+  no cap of the roof under it would leave a storey, the deck's ribbon is cut
+  out of the plan and the largest piece stays on the ground.**
+
+`_decks_through` is the question and `_cut_under_deck` is the answer. Four
+things about them are decisions:
+
+**The test is `clash-check`'s pair and `cap_under_decks`' refusal, together,**
+and the first half is not decoration. A deck solid that shares a footprint's
+whole plan and stands *below* its pad -- a road in a cutting under the block on
+the hill above it -- is refused by the cap for the same arithmetic as a ramp
+through a terrace, and is not a clash at all: `clash-check.bandsOverlap` never
+convicts it and nothing is wrong with the world there. A notch cut in a real
+building to answer a defect that does not exist would be a visible change made
+for an invisible one. So the band is asked first, in the check's own terms over
+the same two prisms the check reads, and what is left after it is the cap's own
+refusal, asked one pass early against the same constants. The pairs a cap would
+fix stay the cap's -- lowering a roof is the gentler repair -- and the pairs it
+cannot are this rung's.
+
+**It cuts, and it never drops.** Under `VIADUCT_PLAN_SHARE` of the plan
+surviving, the polygon *is* the viaduct rather than a building one clips -- the
+3,467 m2 `building=yes` strip at Milsons Point that is the Bradfield Highway
+approach -- and this rung leaves it exactly where it stood, uncut, for
+`cap_under_decks` to delete on the terms `VIADUCT_PLAN_SHARE`'s note argues at
+length. Two rules that could both delete the same polygon on the same evidence
+would be one rule written twice, and the deletion belongs to the one whose
+header argues for it.
+
+**The share that decides that is measured against every deck standing on the
+footprint, not only the ones being cut out of it.** `_decks_through` hands over
+two plans for that reason: the prisms that are through this footprint, which is
+what comes out of the ring, and *all* of them, which is what the viaduct
+question is asked of -- because it is the plan `cap_under_decks._remnant_share`
+will ask the same question of a pass later, and the two rules must not disagree
+about which polygons are viaducts. Ask it of the first and the Milsons Point
+strip keeps most of its plan, is cut by a sliver instead of left alone, and is
+then *refused* by a cap that would have dropped it: the Bradfield Highway
+approach back in the world as a 3,400 m2 building, through a change that was
+meant not to touch it.
+
+**Only the prisms that are through it come out.** A ribbon that flies over one
+end of a terrace row and lands through the other has its landing cut and its
+flight capped, rather than the row torn along its length.
+
+**And it costs an ordering**, which is the only thing outside this file that
+moved: `cli.cmd_build` now solves the decks -- and builds the hero landmarks
+they are handed beside -- *before* the elevated pass instead of after it. A cut
+moves a centroid and `Building.tile` is derived from one, so a cut has to happen
+before the tile bucketing; the solve is the only thing that knows whether there
+is air under a bridge. Those two facts have exactly one order between them.
+`decks.DeckNetwork.load` and `landmarks.build_all` read the terrain, the
+anchors and the ways and no building at all, so the move costs nothing else --
+and it buys back the one cost the cap's own drop has always had to pay: the cut
+happens *before* `streets.StreetNetwork.load` subtracts the footprint from the
+paved footpath band, so the ground a cut opens under a ramp is paved rather
+than left as the bare strip a dropped viaduct-polygon leaves behind.
+
+**What the rung is worth, measured.** Two 60 km classifies of the same sources,
+one on the code before this rung and one after, differing in nothing else, and
+the same 28 tiles emitted from each:
+
+| the pass's own census, whole build | before | after |
+|---|---:|---:|
+| `ElevatedReport.cut` | 28 | **80** |
+| `ElevatedReport.dropped` / `quirks` | 5 / 10 | 5 / 10, the same ids |
+| footprints with a deck solid on them | 90 | **53** |
+| `CapReport.capped` | 21 | 22 |
+| `CapReport.dropped` | 2 | 2, the same ids |
+| **`CapReport.refused`** | **48** | **9** |
+
+The 52 new cuts are the rung; not one of them is a deletion, and the pass drops
+and leaves grounded exactly the polygons it did before. Eight of the nine
+refusals left report a soffit *below* the footprint's own pad -- a road in a
+cutting under the block above it, which is the case the band clause exists to
+leave alone.
+
+| `clash-check --radius 600`, the two worst windows | before | after |
+|---|---:|---:|
+| `DECK_IN_BUILDING` at (100, -2850), Milsons Point | 79 pairs, 1,150 m2 | **2 pairs, 7 m2** |
+| `DECK_IN_BUILDING` at (-2470, 0), James Craig Road | 79 pairs, 1,802 m2 | **0 pairs, 0 m2** |
+| every other one of the twelve rows, both windows | | unchanged |
+| the 28 tiles' `.terr.bin` | | byte-identical, and identical to the shipped world's |
+| `undrawn-solids-check --near` on both windows | | every gated number unchanged at 0 |
 """
 
 from __future__ import annotations
@@ -433,6 +561,8 @@ def resolve(
     buildings: list[merge.Building],
     roads: list[osm.OsmRoad],
     terrain,
+    deck_network=None,
+    extra_prisms=(),
 ) -> tuple[list[merge.Building], ElevatedReport]:
     """Give every elevated structure a base, and take the walls off the roads.
 
@@ -442,6 +572,12 @@ def resolve(
     centroid matters and is the reason the caller must bucket by tile *after*
     this runs: `Building.tile` is derived from it, and cutting an arm off a
     footprint can move it across a tile line.
+
+    `deck_network` and `extra_prisms` are the solved decks and the hero landmark
+    prisms, and they are the whole input to the fourth rung -- see `_decide`'s
+    branch 4 and the header. Both are optional, and with neither this pass is
+    exactly the three rungs it was, which is what every caller with no deck
+    solve to hand relies on.
 
     Runs on every build, including a `--retile`, because it is derived rather
     than stored: the tags it reads ride in the `buildings` table's geometry blob
@@ -453,6 +589,17 @@ def resolve(
     # The two spatial indexes this pass asks its questions of. Built once: the
     # per-building work below is a handful of tree queries and the trees are the
     # only expensive thing here.
+    #
+    # **`r.bridge` stays out of this list and always will.** This is the index of
+    # carriageways a footprint may not stand on the ground *across*, and the word
+    # doing the work is *ground*: a bridge way is a road in the air, a building
+    # under one is not walling it, and a building a flyover passes over is
+    # corroborated by that flyover's own way -- so a bridge centreline read here
+    # would send real terraces down branch 3 and lift them onto a 5.4 m soffit.
+    # `_verify_resolve`'s `under` case is that measurement. The bridge ways get
+    # their say on the fourth rung instead, through the deck the solve made of
+    # them, which is the only form of them that knows whether there is air under
+    # it. See `_decks_through`.
     centre_lines: list[LineString] = []
     centre_half: list[float] = []
     for r in roads:
@@ -488,13 +635,29 @@ def resolve(
     # can only ever remove candidates, never add them.
     near = _near_bridge_bulk(buildings, bridge_tree, bridge_plans)
 
+    # And the fourth question, which is not asked of a way at all: which
+    # footprints have a *solved* deck lying through them rather than over them.
+    # Empty when the caller handed over no deck solve, which is what keeps this
+    # pass the three rungs it was for every such caller.
+    through = _decks_through(buildings, deck_network, extra_prisms, terrain)
+
     keep: list[merge.Building] = []
     for i, b in enumerate(buildings):
         report.examined += 1
-        if _stated_base(b) is None and not _declared_bridge(b) and b.layer < 1 and not near[i]:
+        deck_cut = through.get(i)
+        if (
+            _stated_base(b) is None
+            and not _declared_bridge(b)
+            and b.layer < 1
+            and not near[i]
+            and deck_cut is None
+        ):
             keep.append(b)
             continue
-        verdict = _decide(b, centre_tree, centre_lines, centre_half, bridge_tree, bridge_plans, terrain, report)
+        verdict = _decide(
+            b, centre_tree, centre_lines, centre_half, bridge_tree, bridge_plans,
+            terrain, deck_cut, report,
+        )
         if verdict is not None:
             keep.append(b)
     return keep, report
@@ -539,9 +702,15 @@ def _decide(
     bridge_tree,
     bridge_plans,
     terrain,
+    deck_cut,
     report: ElevatedReport,
 ) -> merge.Building | None:
-    """One footprint's outcome. None means drop it."""
+    """One footprint's outcome. None means drop it.
+
+    `deck_cut` is `_decks_through`'s answer for this footprint, or None: the
+    plan of the solved decks lying *through* it, and the plan of every deck
+    standing on it at all. The fourth rung's whole input.
+    """
     stated = _stated_base(b)
     declared = _declared_bridge(b)
 
@@ -627,6 +796,19 @@ def _decide(
             if mapped_bridge:
                 report.dropped.append((b.id, f"{why}; nothing under it but the span"))
                 return None
+
+    # ---- 4. A solved deck lies *through* it rather than over it. -------------
+    #
+    # The bridge ways' rung, and it is reached only by a footprint none of the
+    # three above claimed: no stated base, nothing declared, and no public
+    # *ground* carriageway inside it. What is inside it is a deck the solve put
+    # on the ground -- a touchdown ramp, an approach embankment -- and a building
+    # with one of those through it is the same picture as a building with a road
+    # through it, so it gets the same answer. See `_decks_through` for why the
+    # question is asked of the solved deck and never of the bridge way.
+    elif deck_cut is not None:
+        return _cut_under_deck(b, poly, deck_cut, report)
+
     else:
         return b
 
@@ -654,6 +836,57 @@ def _decide(
         report.dropped.append((b.id, why))
         return None
     report.quirks.append((b.id, why))
+    return b
+
+
+def _cut_under_deck(b, poly, deck_cut, report: ElevatedReport) -> merge.Building:
+    """Take a grounded deck's ribbon out of a footprint. Never deletes.
+
+    `_decide`'s repair ladder with its top and bottom rungs taken off, and both
+    removals are the point.
+
+    **It cannot raise.** A deck lying on the ground through a building is not a
+    building that wants lifting: lifting it would put a roof over a ramp the
+    player drives on, which is this module's own bug with the storeys the other
+    way up.
+
+    **It cannot drop, and that is the rung `cap_under_decks` keeps.** Under
+    `VIADUCT_PLAN_SHARE` of the plan surviving, the polygon *is* the viaduct
+    rather than a building a viaduct clips -- the 3,467 m2 `building=yes` strip
+    at Milsons Point that is the Bradfield Highway approach -- and this leaves it
+    exactly where it stood, uncut, for `cap_under_decks` to put to that question
+    and delete on its own terms. Two rules that could both delete the same
+    polygon on the same evidence would be one rule written twice.
+
+    **And the share that decides it is read against every deck standing on the
+    footprint, not against the ones being cut out of it.** That is the one line
+    in here that is a bug avoided rather than a decision taken: the plan this
+    asks the viaduct question of has to be the plan `cap_under_decks` will ask
+    it of next, or the two rules disagree about which polygons are viaducts and
+    the Milsons Point strip comes back into the world as a building, trimmed by
+    a sliver and then refused by a cap that would have dropped it.
+
+    So this rung's whole vocabulary is *cut*: over the share there is a building
+    here and the ribbon comes out of it, under it there is not and nothing is
+    touched.
+    """
+    through, whole = deck_cut
+    keep = _remnant_share(poly, [whole])
+    if keep is not None and keep < VIADUCT_PLAN_SHARE:
+        # The polygon is the viaduct. `cap_under_decks` owns what happens next,
+        # and it has to see the plan this pass was handed.
+        return b
+    remnant = _largest_remnant(poly, through)
+    share = (remnant.area / poly.area) if poly.area > 0 else 0.0
+    why = (
+        f"a solved deck lies on the ground through it,"
+        f" {share * 100:.0f}% of plan survives the cut"
+    )
+    if remnant.area < MIN_REMNANT_M2 or remnant.area >= poly.area:
+        report.quirks.append((b.id, f"{why}, which is neither a building nor the viaduct"))
+        return b
+    _recut(b, remnant)
+    report.cut.append((b.id, why))
     return b
 
 
@@ -708,23 +941,112 @@ def cap_under_decks(
 
     report = CapReport()
 
-    prisms = [
-        p
-        for key in deck_network.tile_keys()
-        for p in deck_network.prisms(key)
-        if p.kind in DECK_KINDS
-    ]
-    prisms += [p for p in extra_prisms if p.kind in DECK_KINDS]
+    prisms = _deck_prisms(deck_network, extra_prisms)
     report.prisms = len(prisms)
     if not prisms or not buildings:
         return report
 
-    # A plan grid over the footprints rather than an STRtree, and the reason is
-    # memory: an STRtree wants a shapely geometry per building and there are
-    # 1.29 M of them, where a grid wants two floats and an integer. The prisms
-    # are 72,000, so the loop runs the cheap way round -- query per prism, not
-    # per building. Only the pairs that survive the box test are ever built as
-    # polygons.
+    over, plans, report.candidates = _decks_over(buildings, prisms)
+    report.under_deck = len(over)
+    # Ascending index rather than the pairing's own insertion order, so that the
+    # report a build prints is a function of the building list and not of which
+    # prism happened to be visited first.
+    for i in sorted(over):
+        b = buildings[i]
+        pad, _ = tiles._pad_and_skirt(terrain, b)
+        base = pad + b.base_height
+        soffit = min(s for s, _h, _plan in over[i])
+        cap = soffit - DECK_HEADROOM_M
+        top = base + b.height
+        if top <= cap:
+            continue
+        storey = _storey_height(b)
+        if cap - base >= storey:
+            report.capped.append((b.id, float(b.height), float(cap - base)))
+            b.height = float(cap - base)
+            continue
+        # The floor binds: the deck is not over this footprint, it is *through*
+        # it, and there is no cap that is also a building. `elevated._decide`'s
+        # own last question then applies, with a solved deck standing in for the
+        # bridge way it usually asks about -- see the header.
+        #
+        # **Reaching here at all is now the exception rather than the rule**, and
+        # the reason is one pass upstream: `resolve`'s fourth rung asks
+        # `_decks_through` the same question before the bucketing and cuts the
+        # ribbon out of everything it can. What arrives here is what that rung
+        # left -- the polygons that *are* the viaduct, which are this rule's to
+        # drop, and the handful with no remnant worth keeping.
+        keep = _remnant_share(plans.get(i), [plan for _s, _h, plan in over[i]])
+        if keep is not None and keep < VIADUCT_PLAN_SHARE:
+            why = (
+                f"{100 * keep:.0f}% of its plan survives the deck corridor, so the"
+                f" polygon is the viaduct: a {b.height:.1f} m"
+                f" {b.archetype or 'building'} of {b.area:,.0f} m2 with a soffit at"
+                f" {soffit:.2f} m over a base at {base:.2f} m"
+            )
+            report.dropped.append((b.id, why))
+            continue
+        report.refused.append(
+            (b.id, f"soffit {soffit:.2f} m over a base at {base:.2f} m leaves"
+                   f" {cap - base:.2f} m, under one storey of {storey:.2f} m; "
+                   + ("no plan" if keep is None else f"{100 * keep:.0f}% of the plan survives"))
+        )
+    if report.dropped:
+        gone = {bid for bid, _ in report.dropped}
+        buildings[:] = [b for b in buildings if b.id not in gone]
+    return report
+
+
+def _deck_prisms(deck_network, extra_prisms=()) -> list:
+    """Every solid in this build that is a road over something.
+
+    One function, so that `resolve`'s fourth rung and `cap_under_decks` cannot be
+    looking at two different worlds: a footprint the cut considered and the cap
+    did not, or the other way round, would be two rules disagreeing about which
+    decks exist, which is the one disagreement neither of them could survive.
+    """
+    out = (
+        []
+        if deck_network is None
+        else [
+            p
+            for key in deck_network.tile_keys()
+            for p in deck_network.prisms(key)
+            if p.kind in DECK_KINDS
+        ]
+    )
+    out += [p for p in extra_prisms if p.kind in DECK_KINDS]
+    return out
+
+
+def _decks_over(buildings: list[merge.Building], prisms: list):
+    """Which deck solids stand on which footprints, in plan.
+
+    Returns `(over, plans, candidates)`: `over` maps a building's index to the
+    `(base, height, plan)` of every deck solid sharing at least
+    `DECK_OVERLAP_M2` of plan with it, `plans` the shapely polygon built for
+    each such footprint along the way, and `candidates` the number of pairs that
+    survived the box test.
+
+    A plan grid over the footprints rather than an STRtree, and the reason is
+    memory: an STRtree wants a shapely geometry per building and there are
+    1.29 M of them, where a grid wants two floats and an integer. The prisms are
+    72,000, so the loop runs the cheap way round -- query per prism, not per
+    building. Only the pairs that survive the box test are ever built as
+    polygons.
+
+    **Both passes pay for this separately, and that is deliberate.** `resolve`
+    cuts rings, so the pairing it computed is stale the moment it has finished
+    and `cap_under_decks` has to ask again, against the plans that survived.
+    Sharing the answer would be sharing a measurement of geometry that no longer
+    exists; sharing the *question* is what `_deck_prisms` is for.
+    """
+    over: dict[int, list[tuple[float, float, Polygon]]] = {}
+    plans: dict[int, Polygon] = {}
+    candidates = 0
+    if not prisms or not buildings:
+        return over, plans, candidates
+
     grid: dict[tuple[int, int], list[int]] = {}
     boxes = np.empty((len(buildings), 4))
     for i, b in enumerate(buildings):
@@ -736,14 +1058,6 @@ def cap_under_decks(
             for cz in range(int(np.floor(z0 / CAP_CELL_M)), int(np.floor(z1 / CAP_CELL_M)) + 1):
                 grid.setdefault((cx, cz), []).append(i)
 
-    # The lowest deck underside over each footprint, and the plan those decks
-    # occupy on it. `inf` is "no deck here", which is all but a few thousand of
-    # them; the corridor is only kept for the ones that have one, because it is
-    # the second question -- *is this polygon the viaduct* -- and nothing that is
-    # comfortably under a deck ever gets asked it.
-    soffit = np.full(len(buildings), np.inf)
-    plans: dict[int, Polygon] = {}
-    corridor: dict[int, list[Polygon]] = {}
     for p in prisms:
         r = p.ring
         px0, px1 = float(r[:, 0].min()), float(r[:, 0].max())
@@ -759,7 +1073,7 @@ def cap_under_decks(
             bx0, bz0, bx1, bz1 = boxes[i]
             if bx1 < px0 or bx0 > px1 or bz1 < pz0 or bz0 > pz1:
                 continue
-            report.candidates += 1
+            candidates += 1
             if plan is None:
                 plan = Polygon(r)
                 if not plan.is_valid:
@@ -776,47 +1090,82 @@ def cap_under_decks(
                 continue
             if shared < DECK_OVERLAP_M2:
                 continue
-            soffit[i] = min(soffit[i], p.base)
-            corridor.setdefault(i, []).append(plan)
+            over.setdefault(i, []).append((float(p.base), float(p.height), plan))
+    return over, plans, candidates
 
-    under = np.flatnonzero(np.isfinite(soffit))
-    report.under_deck = len(under)
-    for i in under:
+
+def _decks_through(
+    buildings, deck_network, extra_prisms, terrain
+) -> dict[int, tuple[Polygon, Polygon]]:
+    """Which footprints have a deck through them, and the two plans that decide it.
+
+    Each answer is `(the prisms that are through it, every prism standing on
+    it)`. The first is what `_cut_under_deck` takes out of the plan; the second
+    is what it asks the viaduct question of, because that is the plan
+    `cap_under_decks._remnant_share` will ask the same question of a pass later
+    and the two must not disagree. See `_cut_under_deck`.
+
+    **This is the one thing about a bridge that a bridge way cannot tell us.**
+    `resolve`'s three older rungs read the ways, and a way tagged `bridge` says
+    only that a structure carries it -- not whether, at the metre where that
+    road crosses this roof, there is any air under it. There is none under a
+    touchdown ramp, an approach embankment or a span over a culvert, and those
+    are the crossings that make this defect; there is 5.4 m of it over every
+    flyover, and a rule that read the way would treat the two identically and
+    carve a slot through the terraces under the second. The solve knows the
+    difference and nothing before it does, which is why `cli.cmd_build` now runs
+    `decks.DeckNetwork.load` *before* this pass and hands the answer in.
+
+    **A prism is through a footprint when two things are true of it**, and both
+    are borrowed rather than invented:
+
+      1. **its solid and the building's occupy the same band** --
+         `clash-check.bandsOverlap` exactly, over the same two prisms the check
+         reads, `[base, base + height]` either side. Nothing else is a clash. A
+         deck in a cutting under the block on the hill above it shares that
+         block's whole plan and shares nothing else, and a notch cut in a real
+         building to answer a defect that is not there would be a visible change
+         made for an invisible one. `cap_under_decks`' refusal test on its own
+         does not have this clause and over-counts because of it.
+      2. **and capping the roof under it would leave less than one storey** --
+         `cap_under_decks`' own refusal, asked one pass early, the same
+         arithmetic against the same constants. Where a cap *would* fit the cap
+         gets it: lowering a roof is the gentler repair and it stays the cap's.
+
+    The prisms that clear the roof are deliberately left out of the plan handed
+    back: a ribbon that flies over one end of a terrace row and lands through the
+    other should have its landing cut out and its flight capped, not the whole
+    row torn along its length.
+    """
+    if deck_network is None and not extra_prisms:
+        return {}
+    from . import tiles  # local: `tiles` imports `decks`, and this is one caller
+
+    over, _plans, _candidates = _decks_over(
+        buildings, _deck_prisms(deck_network, extra_prisms)
+    )
+    out: dict[int, tuple[Polygon, Polygon]] = {}
+    for i, stack in over.items():
         b = buildings[i]
         pad, _ = tiles._pad_and_skirt(terrain, b)
         base = pad + b.base_height
-        cap = float(soffit[i]) - DECK_HEADROOM_M
         top = base + b.height
-        if top <= cap:
-            continue
         storey = _storey_height(b)
-        if cap - base >= storey:
-            report.capped.append((b.id, float(b.height), float(cap - base)))
-            b.height = float(cap - base)
-            continue
-        # The floor binds: the deck is not over this footprint, it is *through*
-        # it, and there is no cap that is also a building. `elevated._decide`'s
-        # own last question then applies, with a solved deck standing in for the
-        # bridge way it usually asks about -- see the header.
-        keep = _remnant_share(plans.get(i), corridor.get(i, ()))
-        if keep is not None and keep < VIADUCT_PLAN_SHARE:
-            why = (
-                f"{100 * keep:.0f}% of its plan survives the deck corridor, so the"
-                f" polygon is the viaduct: a {b.height:.1f} m"
-                f" {b.archetype or 'building'} of {b.area:,.0f} m2 with a soffit at"
-                f" {soffit[i]:.2f} m over a base at {base:.2f} m"
+        blocking = [
+            plan
+            for soffit, height, plan in stack
+            # The bands overlap, `clash-check.bandsOverlap`'s own inequality ...
+            if soffit < top
+            and soffit + height > base
+            # ... and no cap of this roof would leave a storey under that soffit.
+            and soffit - DECK_HEADROOM_M - base < storey
+        ]
+        if blocking:
+            out[i] = (
+                unary_union(blocking),
+                unary_union([plan for _s, _h, plan in stack]),
             )
-            report.dropped.append((b.id, why))
-            continue
-        report.refused.append(
-            (b.id, f"soffit {soffit[i]:.2f} m over a base at {base:.2f} m leaves"
-                   f" {cap - base:.2f} m, under one storey of {storey:.2f} m; "
-                   + ("no plan" if keep is None else f"{100 * keep:.0f}% of the plan survives"))
-        )
-    if report.dropped:
-        gone = {bid for bid, _ in report.dropped}
-        buildings[:] = [b for b in buildings if b.id not in gone]
-    return report
+    return out
 
 
 def _remnant_share(poly: Polygon | None, corridor) -> float | None:
@@ -1018,8 +1367,200 @@ def _ground_at(b: merge.Building, terrain) -> float | None:
     return h if np.isfinite(h) else None
 
 
+class _Flat:
+    """Ground at y = 0, and a `densify` that adds nothing to a ring."""
+
+    @staticmethod
+    def sample(e, north=None):
+        if north is None:
+            return 0.0
+        return 0.0 if np.ndim(e) == 0 else np.zeros(np.shape(e))
+
+    @staticmethod
+    def densify(pts):
+        return np.asarray(pts, dtype=np.float64)
+
+
+class _Net:
+    """A `DeckNetwork` with one tile and a fixed list of prisms."""
+
+    def __init__(self, prisms):
+        self._p = prisms
+
+    def tile_keys(self):
+        return {"0_0"}
+
+    def prisms(self, _key):
+        return self._p
+
+
+def _rect(cx, cz, hx, hz):
+    return np.array(
+        [[cx - hx, cz - hz], [cx + hx, cz - hz], [cx + hx, cz + hz], [cx - hx, cz + hz]],
+        dtype=np.float64,
+    )
+
+
+def _test_building(bid, cx, cz, hx, hz, height, **kw):
+    b = merge.Building(id=bid, source=kw.pop("source", "osm"), ring=_rect(cx, cz, hx, hz))
+    b.area = float(4 * hx * hz)
+    b.centroid = (cx, cz)
+    b.height = height
+    b.archetype = "terrace"
+    for k, v in kw.items():
+        setattr(b, k, v)
+    return b
+
+
+def _test_way(pts, highway="primary", **kw):
+    return osm.OsmRoad(
+        osm_id=kw.pop("osm_id", "w"),
+        line=np.asarray(pts, dtype=np.float64),
+        highway=highway,
+        name=None,
+        lanes=None,
+        oneway=False,
+        width=kw.pop("width", 20.0),
+        is_foot=kw.pop("is_foot", False),
+        layer=kw.pop("layer", 0),
+        tunnel=kw.pop("tunnel", False),
+        bridge=kw.pop("bridge", False),
+    )
+
+
+def _verify_resolve() -> list[str]:
+    """The wall, the retail block, the flyover, the ramp and the cutting.
+
+    **The first two are the bug this module exists for and there was no test for
+    them**, which is exactly the hole the fourth rung could have fallen into: a
+    rule that teaches `resolve` to read bridges is one edit away from teaching it
+    to lift the buildings *under* them, and the only thing that catches that is a
+    case saying a footbridge blob across a road must still go and a terrace under
+    a flyover must still stay, on the ground, uncut and its own height. Both are
+    here, and so are the two the new rung owns.
+
+    Six buildings, one flat ground, four ways and three deck solids. Costs
+    microseconds and touches no data.
+    """
+    failures: list[str] = []
+
+    # 1. THE WALL. A 40 x 24 m ML blob lying across a 20 m primary road with a
+    #    footbridge mapped along it -- Longueville Road at Lane Cove. A quarter
+    #    of its plan survives the road, so the polygon *is* the crossing, and a
+    #    3 m roof cannot be lifted to a 5.4 m soffit: it goes.
+    wall = _test_building("wall", 0.0, 0.0, 20.0, 12.0, 3.0, source="ms")
+    # 2. THE RETAIL BLOCK. The same road clipping the edge of a 60 m square with
+    #    the same footbridge on it -- Military Road at Mosman. Most of the plan
+    #    survives, so it is a building with an arm over a road: the arm comes off
+    #    and the block stays on the ground.
+    block = _test_building("block", 300.0, 25.0, 30.0, 30.0, 12.0, source="ms")
+    # 3. THE FLYOVER, and it is the control the fourth rung is dangerous without:
+    #    a real 10 m building with a viaduct 12 m *over* it. A bridge way runs
+    #    straight through its plan and it must come back whole, on the ground and
+    #    uncut. Lowering its roof is `cap_under_decks`' business; cutting its plan
+    #    or lifting it is nobody's.
+    under = _test_building("under", 600.0, 0.0, 15.0, 15.0, 10.0)
+    # 4. THE RAMP. The same picture with the deck on the ground through it.
+    ramp = _test_building("ramp", 900.0, 0.0, 20.0, 10.0, 10.0)
+    # 5. THE CUTTING, and the second control: the same plan overlap with the
+    #    deck's whole solid *below* the building's, which is a road in a cutting
+    #    under the block on the hill above it and is not a clash at all.
+    #    `cap_under_decks`' refusal arithmetic cannot tell it from the ramp;
+    #    `clash-check.bandsOverlap` can, and so does `_decks_through`.
+    hill = _test_building("hill", 1200.0, 0.0, 20.0, 10.0, 10.0)
+    # 6. AND THE CONTROL ON ALL OF IT: 300 m from every road and every deck.
+    away = _test_building("away", 1500.0, 0.0, 10.0, 10.0, 10.0)
+
+    every = [wall, block, under, ramp, hill, away]
+    roads = [
+        # The carriageway, straight through the wall blob and clipping the block.
+        _test_way([(-60.0, 0.0), (360.0, 0.0)], "primary", width=20.0),
+        # Mapped on it, which is what corroborates both of those as crossings.
+        _test_way([(-60.0, 0.0), (360.0, 0.0)], "footway", is_foot=True, layer=1, bridge=True),
+        # And a viaduct over `under`, which must corroborate nothing at all here.
+        _test_way([(560.0, 0.0), (640.0, 0.0)], "motorway", layer=1, bridge=True),
+        # A tunnel under `away`, which is not a road anything stands across.
+        _test_way([(1450.0, 0.0), (1550.0, 0.0)], "primary", layer=-1, tunnel=True),
+    ]
+    from .landmarks import Prism
+
+    net = _Net([
+        # Over `under`: a soffit 12 m up, clear of a 10 m roof and a storey.
+        Prism(_rect(600.0, 0.0, 6.0, 20.0), 12.0, 2.0, "deck"),
+        # Through `ramp`: `decks.prisms`' embankment form, base under the ground.
+        Prism(_rect(900.0, 0.0, 5.0, 15.0), -0.5, 4.0, "deck"),
+        # And under `hill`: the same plan, a solid that tops out 16 m below it.
+        Prism(_rect(1200.0, 0.0, 5.0, 15.0), -20.0, 4.0, "deck"),
+    ])
+
+    kept, report = resolve(every, roads, _Flat, net)
+    by_id = {b.id: b for b in kept}
+
+    if "wall" in by_id or [b for b, _ in report.dropped] != ["wall"]:
+        failures.append(
+            f"the blob walling a road with a footbridge on it survived:"
+            f" dropped {[b for b, _ in report.dropped]}, kept {sorted(by_id)}"
+        )
+    if "block" not in by_id or not (0.5 < by_id["block"].area / 3600.0 < 0.95):
+        failures.append(
+            f"the retail block over the same road came back at"
+            f" {by_id['block'].area if 'block' in by_id else 0:,.0f} m2 of 3,600,"
+            " where the road's arm and nothing else was due off it"
+        )
+    if (
+        "under" not in by_id
+        or by_id["under"].area != 900.0
+        or by_id["under"].height != 10.0
+        or by_id["under"].base_height != 0.0
+    ):
+        # Measured rather than asserted on faith: with that same viaduct way put
+        # into `centre_lines` as though it were a ground carriageway, this
+        # building comes back raised to a 5.4 m soffit with 4.6 m of roof left on
+        # it -- a terrace floated into the air because a motorway passes over it.
+        failures.append(
+            f"a building under a viaduct 12 m over it was cut, shortened or lifted"
+            f" by the road rules: {by_id['under'].area if 'under' in by_id else 0:,.0f} m2"
+            f" of 900, {by_id['under'].height if 'under' in by_id else 0:.1f} m of 10.0,"
+            f" base {by_id['under'].base_height if 'under' in by_id else -1:.1f} m"
+        )
+    if "ramp" not in by_id or not (250.0 < by_id["ramp"].area < 350.0):
+        failures.append(
+            f"the deck lying on the ground through a building did not cut it:"
+            f" {by_id['ramp'].area if 'ramp' in by_id else 0:,.0f} m2 of 800,"
+            f" 300 was due; cut {[b for b, _ in report.cut]}"
+        )
+    if "hill" not in by_id or by_id["hill"].area != 800.0:
+        failures.append(
+            f"a building with a deck's whole solid 16 m below it was cut as though"
+            f" the deck were through it:"
+            f" {by_id['hill'].area if 'hill' in by_id else 0:,.0f} m2 of 800"
+        )
+    if "away" not in by_id or by_id["away"].area != 400.0 or by_id["away"].base_height != 0.0:
+        failures.append("the control 300 m from every road and every deck was touched")
+
+    # And the same pass with no deck solve at all is the three rungs it was.
+    plain = [
+        _test_building("wall", 0.0, 0.0, 20.0, 12.0, 3.0, source="ms"),
+        _test_building("ramp", 900.0, 0.0, 20.0, 10.0, 10.0),
+    ]
+    kept, _ = resolve(plain, roads, _Flat)
+    if [b.id for b in kept] != ["ramp"] or kept[0].area != 800.0:
+        failures.append(
+            f"without a deck network the pass is not the three rungs it was:"
+            f" kept {[(b.id, b.area) for b in kept]}"
+        )
+    return failures
+
+
 def verify_elevated() -> list[str]:
-    """The cap's six claims, on made-up geometry and made-up ground.
+    """`_verify_resolve`'s six, then the cap's six, on made-up ground.
+
+    The two halves are one gate because the two rules are one seam and a change
+    to either moves the other: the cut runs first and hands the cap the plans it
+    left, so a cut that took too much and a cap that refused too often are the
+    same regression seen from two sides.
+
+    The cap's half, stated as it always was:
 
     Six, and two of them are negative controls, because the failure mode of a
     rule that lowers roofs is not that it misses one -- a missed one is a pair
@@ -1032,47 +1573,11 @@ def verify_elevated() -> list[str]:
     Costs microseconds and touches no data. Wired into `cli.cmd_build`'s gate
     beside `decks.verify_decks`, which is the pipeline's boot list.
     """
-    failures: list[str] = []
-
-    class _Flat:
-        """Ground at y = 0, and a `densify` that adds nothing to a ring."""
-
-        @staticmethod
-        def sample(e, north=None):
-            if north is None:
-                return 0.0
-            return 0.0 if np.ndim(e) == 0 else np.zeros(np.shape(e))
-
-        @staticmethod
-        def densify(pts):
-            return np.asarray(pts, dtype=np.float64)
-
-    class _Net:
-        def __init__(self, prisms):
-            self._p = prisms
-
-        def tile_keys(self):
-            return {"0_0"}
-
-        def prisms(self, _key):
-            return self._p
+    failures: list[str] = _verify_resolve()
 
     from .landmarks import Prism
 
-    def _rect(cx, cz, hx, hz):
-        return np.array(
-            [[cx - hx, cz - hz], [cx + hx, cz - hz], [cx + hx, cz + hz], [cx - hx, cz + hz]],
-            dtype=np.float64,
-        )
-
-    def _building(bid, cx, cz, hx, hz, height):
-        b = merge.Building(id=bid, source="osm", ring=_rect(cx, cz, hx, hz))
-        b.area = float(4 * hx * hz)
-        b.centroid = (cx, cz)
-        b.height = height
-        b.archetype = "terrace"
-        return b
-
+    _building = _test_building
     under = _building("under", 0.0, 0.0, 5.0, 5.0, 20.0)
     beside = _building("beside", 400.0, 0.0, 5.0, 5.0, 20.0)
     clip = _building("clip", 0.0, 100.0, 5.0, 5.0, 20.0)
