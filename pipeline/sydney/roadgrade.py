@@ -392,6 +392,141 @@ MAX_SWEEPS = 400
 SIGN_CORRECTED_M = 1.5
 SIGN_BUILT_M = 12.0
 
+# --- The bound on the projection ----------------------------------------------
+#
+# **The block above is right about the sign and silent about the size, and the
+# silence is what the round-three world was billed for.** `relax_down` is a
+# fixpoint of `h_i <- min(h_i, h_j + limit)` and nothing in it remembers where a
+# violation came from: a post the shore rule pulled down eleven metres is
+# believed, and then every post tied to it is pulled to the grade limit, and then
+# every post tied to *those*, out to `MAX_SWEEPS` -- four kilometres of road --
+# with no term anywhere that says how much evidence is being spent. The sentence
+# the block above exists to make true, *a post whose height is already known
+# pulls its neighbours down along the grade limit*, is missing its second half:
+# **by how much.**
+#
+# What it cost, measured on the round-three 60 km world against round two:
+# 11,095 terrain tiles differ and the deepest drops are not the harbour at all.
+#
+#   Coledale / Scarborough, the Illawarra coast     up to 27.1 m, 200+ posts/tile
+#   Manly                                                     18.6 m
+#   Kirribilli                                                14.2 m
+#   Brooklyn and the Hawkesbury villages                     8 - 10 m
+#   Penrith on the Nepean                                      8.7 m
+#   Cronulla                                                   6.8 m
+#
+# Every one of them is the same shape: a village on a headland or an escarpment,
+# a corrected waterline a hundred metres below it, and a tie chain between the
+# two. The Illawarra ones are the proof that this is a defect and not a strong
+# opinion -- Coledale sits on the escarpment above the sea with **no towers in
+# it**, so the DSM there is reading real ground and `bareearth`'s own estimator
+# says so, and the projection took eighteen metres off the median post of a tile
+# anyway. The CBD's twenty metres and the Quay's ten are the intended result and
+# always were; what separates them from Coledale is not distance from water, it
+# is whether anybody measured anything that would pay for the drop.
+#
+# **So the operator gains the term it was missing: a budget, in metres.**
+#
+#     budget_i  = BOUND_TOL_M + max( built_i , max_j ( metres_j - BOUND_DECAY * d_ij ) )
+#     floor_i   = sym_i - budget_i
+#     out       = relax_down( max( mixture , relax_up( min(floor, h) ) ) )
+#
+# In words, and it is the brief read back: *a trusted post may pull a neighbour
+# down by no more than the evidence it carries -- its own correction, decaying
+# along the run, or the neighbour's own built mass -- and never past that below
+# the answer the symmetric projection would have given.*
+#
+# **The floor is relative to `sym` and that is the one design decision here.**
+# An absolute floor -- "never below this post's bare-earth estimate" -- is the
+# tempting form and it is wrong, because a road is allowed to cut into a hill:
+# the grade clamp takes a crest down by whatever 15% costs it and that is a
+# cutting, not an error. `sym` is the answer this module gave before it learned
+# about signs, so a floor at `sym - budget` binds on **exactly** the thing this
+# budget is about -- how far the one-sidedness took a node past where the
+# even-handed operator would have left it -- and is inert everywhere else. On a
+# steep street inland with no evidence within reach the budget is `BOUND_TOL_M`,
+# the answer is `sym` already, and the floor never touches it.
+#
+# **Three properties, and the third is why nothing above this line changes.**
+#
+#   * `low <= out <= sym`, node by node, **still**. `floor <= sym - BOUND_TOL_M`
+#     and `sym` is feasible, so `relax_up(min(floor, h)) <= relax_up(sym) = sym`;
+#     the mixture is already `<= sym`; and a downward relax of something `<= sym`
+#     is `<= sym`. So `roadgrade-sign-check.py`'s gate is untouched and §3e's
+#     headline -- *nothing in Sydney is ever raised by this change* -- still
+#     holds word for word. The bound spends the one-sidedness back toward the
+#     average and can never spend past it.
+#   * `out` obeys every budget exactly. `relax_up(min(floor, h))` is feasible by
+#     construction and `<=` the mixture's own relax input, so the final downward
+#     relax is a projection of a feasible-bounded field and the fixpoint is
+#     reached the same way it always was.
+#   * with no evidence anywhere it is the symmetric answer bit for bit, by the
+#     same early return, because a budget with nothing in it is not consulted.
+#
+# **`min(floor, h)` is not a detail.** A floor may stop a node falling; it may
+# never lift one. Clamping the floor to the node's own height before the upward
+# relax is what makes that true, and it is also what makes `out <= high` provable
+# without an argument about which stage of the solve `h` is.
+#
+# --- The two constants --------------------------------------------------------
+#
+# **These two are knobs, and saying so is the point.** `SIGN_CORRECTED_M`'s sweep
+# one screen above found that its constants were not -- the Quay did not move
+# across a factor of eight -- because that operator's work is done by a relax
+# that either binds or does not. This one is different and the sweep says so in
+# the first two rows it prints. Every row below is a full 5.3 km solve, one-sided,
+# shore on. The columns are the Quay transect at N820 and Circular Quay's station
+# ground -- the two numbers §3e bought and this block may not give back --
+# Kirribilli, which is the one instance of the regression inside this ring, Town
+# Hall, the Kings Cross pair, and how many nodes the floor bound directly. The
+# `off` row is `BOUND_TOL_M` at a billion, which is this operator switched off,
+# and it reproduces §3e's published column exactly.
+#
+#  decay  tol |  N820  Quay stn | Kirribilli | Town Hall | ridge  'Loo | bound
+#   0.05  off | 15.18     20.36 |     65.18  |     68.48 | 45.16  5.10 |     0
+# >  0.05 2.0 | 15.36     20.63 |     74.29  |     69.62 | 46.72  5.13 |   401
+#   0.05  1.0 | 15.95     21.02 |     74.66  |     69.62 | 46.87  5.18 | 1,087
+#   0.05  4.0 | 15.18     20.36 |     72.29  |     69.61 | 46.33  5.10 |    20
+#   0.02  2.0 | 15.18     20.36 |     69.21  |     69.12 | 45.81  5.10 |     0
+#   0.10  2.0 | 22.64     26.10 |     74.29  |     69.62 | 46.72  5.14 |   690
+#
+#             the symmetric answer, for reference, is 26.42 / 30.56 / 74.47 /
+#             69.62 / 46.91 / 6.77.
+#
+# **`BOUND_DECAY` is 0.05 metres of budget per metre of run, and the two rows
+# either side of it are the two ways to be wrong.** At **0.10** the budget dies
+# in half the distance and the Quay goes back to 22.64 -- the bound has started
+# eating the correction it was supposed to protect, because the CBD ground that
+# depends on the shore's evidence is further from it than the evidence now
+# travels. At **0.02** the budget reaches 575 m, further than anything in this
+# pipeline has measured anything, and Kirribilli only comes back to 69.21 of the
+# 74.47 it should. The right answer is fixed by the one distance that is already
+# a constant here: an 11.5 m correction -- the shore pass's write at the Quay --
+# carries **230 m at 0.05**, which is `SHORE_REACH_M`. *Evidence reaches exactly
+# as far past the band as the band is wide.* It is also `OPENING_M`'s note on how
+# wide DSM contamination actually is, *"a tower's footprint in a 60 m-smoothed
+# DEM is 150-250 m across"*, read as a distance instead of as a filter length.
+#
+# `BOUND_TOL_M` is **2.0 m**: what a node may lose with no evidence at all, which
+# is the slack between the smoothed profile the floor is built on and the
+# projection that is about to move it. `solve`'s own `drop_p95` on the 60 km
+# world is 1.95 m and `conform`'s `moved_p95` is the same order, so two metres is
+# this module's own noise floor rather than a number chosen to buy a result. The
+# rows either side cost what a tolerance costs and nothing surprising: **4.0**
+# leaves the Quay untouched to the centimetre and gives up two metres of
+# Kirribilli, **1.0** takes the last half-metre of Kirribilli and costs the Quay
+# 0.77 m. The middle row's cost at the Quay is **0.18 m on an eleven-metre
+# correction**, which is the trade this constant exists to make.
+#
+# **And the Kings Cross escarpment gets safer, not more dangerous.** The relief
+# between the ridge and the Woolloomooloo floor is 40.14 m symmetric and 40.06
+# unbounded; bounded it is **41.59**, because Woolloomooloo is inside the shore
+# band and keeps its evidence while the ridge above it stops paying for a
+# correction nobody measured up there. A bound whose whole job is to stop the
+# projection flattening landform should move that number the way this one does.
+BOUND_DECAY = 0.05
+BOUND_TOL_M = 2.0
+
 
 class GroundEvidence:
     """How well the ground under each lattice post is already known, 0 to 1.
@@ -406,18 +541,38 @@ class GroundEvidence:
     because the three views are three views of one fact and evidence at one of
     them is evidence. Nothing here subtracts confidence: a pass that knows
     nothing about a post writes nothing to it.
+
+    **Three arrays and not one, since `--- The bound on the projection ---`.**
+    The confidence says which way the error goes and is what `lambda` is built
+    from; the other two are the same measurements kept in **metres**, because a
+    budget is a size and a confidence has thrown the size away. Nothing new is
+    computed for them -- they are the arguments these methods were already being
+    handed, stored instead of normalised and dropped:
+
+      * `m`, metres of downward evidence at this post -- the strongest of what an
+        earlier pass took off it and what the deconvolution says is standing on
+        it, weighted by the shore's own reach exactly as the confidence is. This
+        is what a chain spends as it travels.
+      * `b`, the deconvolution's built mass **unweighted**, which is this post's
+        own answer to "how far below what the DSM says could the ground be". It
+        is not shore-weighted because it is not being read as a belief about the
+        sign here, it is being read as a number of metres of building.
     """
 
     def __init__(self, shape: tuple[int, int], p0: int, q0: int, spacing: float) -> None:
         self.w = np.zeros(shape, dtype=np.float32)
+        self.m = np.zeros(shape, dtype=np.float32)
+        self.b = np.zeros(shape, dtype=np.float32)
         self.p0 = p0
         self.q0 = q0
         self.spacing = spacing
 
     def corrected(self, metres: np.ndarray) -> None:
         """Metres an earlier pass already took off each post. See (1) above."""
-        term = np.clip(np.asarray(metres, dtype=np.float32) / np.float32(SIGN_CORRECTED_M), 0.0, 1.0)
-        np.maximum(self.w, term.reshape(self.w.shape), out=self.w)
+        raw = np.asarray(metres, dtype=np.float32).reshape(self.w.shape)
+        term = np.clip(raw / np.float32(SIGN_CORRECTED_M), 0.0, 1.0)
+        np.maximum(self.w, term, out=self.w)
+        np.maximum(self.m, np.maximum(raw, np.float32(0.0)), out=self.m)
 
     def built(self, where: np.ndarray, metres: np.ndarray, shore_weight: np.ndarray) -> None:
         """`bareearth`'s deconvolution at a subset of posts. See (2) and (3).
@@ -427,12 +582,22 @@ class GroundEvidence:
         `shoreline.conform` already has its band in, so nothing is re-derived to
         report it.
         """
-        term = np.asarray(shore_weight, dtype=np.float64) * np.clip(
-            np.asarray(metres, dtype=np.float64) / SIGN_BUILT_M, 0.0, 1.0
-        )
-        flat = self.w.reshape(-1)
+        # float32 throughout and one temporary at a time: at 60 km the band is
+        # eight million posts, so a float64 intermediate per line would be the
+        # difference between this pass fitting in the head's budget and not.
+        bd = np.clip(np.asarray(metres, dtype=np.float32), np.float32(0.0), None)
+        w = np.asarray(shore_weight, dtype=np.float32)
         idx = np.flatnonzero(np.asarray(where).reshape(-1))
-        flat[idx] = np.maximum(flat[idx], term.astype(np.float32))
+        flat = self.b.reshape(-1)
+        flat[idx] = np.maximum(flat[idx], bd)
+        term = np.clip(bd / np.float32(SIGN_BUILT_M), np.float32(0.0), np.float32(1.0))
+        term *= w
+        flat = self.w.reshape(-1)
+        flat[idx] = np.maximum(flat[idx], term)
+        term = bd
+        term *= w
+        flat = self.m.reshape(-1)
+        flat[idx] = np.maximum(flat[idx], term)
 
     def at(self, east, north) -> np.ndarray:
         """The confidence at arbitrary ENU points, bilinear off the post grid.
@@ -441,11 +606,22 @@ class GroundEvidence:
         station reads its confidence from the same four posts it reads its
         ground from, so the two cannot disagree about which cell it is in.
         """
+        return np.clip(self._sample(self.w, east, north), 0.0, 1.0)
+
+    def metres_at(self, east, north) -> np.ndarray:
+        """Metres of downward evidence at arbitrary ENU points. See `m`."""
+        return np.clip(self._sample(self.m, east, north), 0.0, None)
+
+    def built_at(self, east, north) -> np.ndarray:
+        """The deconvolved built mass at arbitrary ENU points. See `b`."""
+        return np.clip(self._sample(self.b, east, north), 0.0, None)
+
+    def _sample(self, grid: np.ndarray, east, north) -> np.ndarray:
         from .terrain import _bilinear
 
         x = np.asarray(east, dtype=np.float64) / self.spacing - self.p0
         y = np.asarray(north, dtype=np.float64) / self.spacing - self.q0
-        return np.clip(np.asarray(_bilinear(self.w, x, y), dtype=np.float64), 0.0, 1.0)
+        return np.asarray(_bilinear(grid, x, y), dtype=np.float64)
 
     @property
     def any(self) -> bool:
@@ -688,17 +864,38 @@ def solve(
     )
     node_conf = np.zeros(n_nodes)
     np.maximum.at(node_conf, node_of, station_conf)
+    # The same measurements again, in metres this time, because a budget is a
+    # size and `node_conf` has thrown the size away. See `--- The bound on the
+    # projection ---`. A junction takes the strongest of its arms' for the reason
+    # the confidence does: the arm that knows something is the one to believe.
+    node_m = np.zeros(n_nodes)
+    node_b = np.zeros(n_nodes)
+    if evidence is not None:
+        np.maximum.at(node_m, node_of, evidence.metres_at(pts[:, 0], pts[:, 1]))
+        np.maximum.at(node_b, node_of, evidence.built_at(pts[:, 0], pts[:, 1]))
 
-    h = _smooth(obs, edges, edge_len)
+    smoothed = _smooth(obs, edges, edge_len)
     ties, tie_len = _ties(pts, way_of, node_of, n_nodes)
     both = np.vstack((edges, ties))
+    both_len = np.concatenate((edge_len, tie_len))
     soft_limit = np.concatenate((TARGET_GRADE * edge_len, CROSS_GRADE * tie_len))
     hard_limit = np.concatenate((MAX_GRADE * edge_len, CROSS_GRADE * tie_len))
+    # The budget travels the same graph the pull does -- road edges and plan ties
+    # together -- because a pull that reaches through a tie is a pull that has to
+    # pay through one. `None` when no pass ran before this one, which is the same
+    # `None` that gives the old symmetric operator back.
+    budget = None
+    if evidence is not None:
+        budget = BOUND_TOL_M + _allowance(node_m, both, both_len, node_b)
     # The soft pull is one-sided too, and has to be: it is a partial step toward
     # the 10% set and a step that splits the error evenly is exactly the thing
-    # the hard projection below would then have to undo.
-    h = h + SOFT_PULL * (_lipschitz(h, both, soft_limit, node_conf) - h)
-    h_sym, h = _projections(h, both, hard_limit, node_conf)
+    # the hard projection below would then have to undo. It is bounded too, and
+    # for the same reason -- 70% of an unbounded step is still unbounded.
+    bound: dict = {}
+    h = smoothed + SOFT_PULL * (
+        _lipschitz(smoothed, both, soft_limit, node_conf, budget, bound) - smoothed
+    )
+    h_sym, h = _projections(h, both, hard_limit, node_conf, budget, bound)
 
     station_h = h[node_of]
     surface = _segments(ways, corridors, pts, way_of, station_h)
@@ -729,6 +926,18 @@ def solve(
         sign_lowered=int((h_sym - h > 1e-9).sum()),
         sign_p95=float(np.percentile(h_sym - h, 95)),
         sign_max=float((h_sym - h).max()),
+        # What the budget was worth -- **a count of causes, not of consequences,**
+        # and the distinction is the same one the block above makes about
+        # confidence. The floor binds at the handful of nodes that have something
+        # to say, and the final downward relax then carries the lift along the
+        # chain exactly as it carries the pull: 401 nodes bound on the 5.3 km
+        # ring and Kirribilli, which is not one of them, came back 9.11 m.
+        # `0 bound` is `A zero counter means untested`, not a clean bill.
+        bound_budget_p50=float(np.percentile(budget, 50)) if budget is not None else 0.0,
+        bound_budget_p95=float(np.percentile(budget, 95)) if budget is not None else 0.0,
+        bound_nodes=int(bound.get("held", 0)),
+        bound_p95=float(bound.get("held_p95", 0.0)),
+        bound_max=float(bound.get("held_max", 0.0)),
     )
     return surface
 
@@ -990,8 +1199,43 @@ def _ties(pts: np.ndarray, way_of: np.ndarray, node_of: np.ndarray, n_nodes: int
     return np.column_stack((lo[first], hi[first])), np.maximum(d[first], 1.0)
 
 
+def _allowance(
+    metres: np.ndarray, edges: np.ndarray, length: np.ndarray, own: np.ndarray
+) -> np.ndarray:
+    """How many metres of downward pull the evidence justifies at each node.
+
+    `metres` is what each node measured itself -- a correction an earlier pass
+    wrote, or the built mass standing on it -- and `own` is the node's own
+    deconvolved built mass, which needs no chain because it is already about
+    this node. The chain is a max-plus relaxation on the same graph the budgets
+    run on, spending `BOUND_DECAY` metres of allowance per metre travelled:
+
+        a_i = max( own_i , max_j ( metres_j - BOUND_DECAY * d_ij ) )
+
+    which is a shortest-path problem read upside down, and the same sweep as
+    `_projections.relax` for the same reason -- a violation propagates one edge
+    a sweep, the fixpoint does not depend on the order the edges are taken in,
+    and `MAX_SWEEPS` is the longest shadow either of them may cast.
+    """
+    a = np.maximum(np.asarray(metres, dtype=np.float64), 0.0)
+    i, j = edges[:, 0], edges[:, 1]
+    cost = BOUND_DECAY * np.asarray(length, dtype=np.float64)
+    for _ in range(MAX_SWEEPS):
+        before = a.sum()
+        np.maximum.at(a, j, a[i] - cost)
+        np.maximum.at(a, i, a[j] - cost)
+        if a.sum() == before:
+            break
+    return np.maximum(a, np.maximum(np.asarray(own, dtype=np.float64), 0.0))
+
+
 def _projections(
-    h: np.ndarray, edges: np.ndarray, limit: np.ndarray, prefer_low: np.ndarray | None
+    h: np.ndarray,
+    edges: np.ndarray,
+    limit: np.ndarray,
+    prefer_low: np.ndarray | None,
+    budget: np.ndarray | None = None,
+    report: dict | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """(the symmetric answer, the one-sided one) for one budget.
 
@@ -1019,10 +1263,23 @@ def _projections(
     than trusted to be one, so the old behaviour is returned bit for bit and the
     check can assert that instead of arguing about ulps.
 
-    `low <= out <= sym`, node by node: `out` is a relax of something that is
-    pointwise >= `low`, and `relax` is monotone with `low` feasible, so it can
-    never fall below it; and the mixture is pointwise <= the average, which a
-    downward relax only reduces further.
+    `budget` is how many metres below `sym` each node may be taken, which is the
+    size the arithmetic above has no term for -- `--- The bound on the
+    projection ---` is the argument and the shape is one more relax:
+
+        floor = sym - budget
+        out   = relax( max( mixture , relax( min(floor, h) , up ) ) , down )
+
+    `min(floor, h)` because a floor may stop a node falling and may never lift
+    one; the upward relax because a floor taken node by node is no more feasible
+    than a mixture is, and the smallest feasible field above it is what a
+    neighbour actually owes.
+
+    `low <= out <= sym`, node by node, with or without a budget: `out` is a relax
+    of something pointwise >= `low`, and `relax` is monotone with `low` feasible,
+    so it can never fall below it; the mixture is pointwise <= the average; and
+    `floor <= sym` with `sym` feasible gives `relax(floor, up) <= sym`, so the
+    downward relax is applied to something that is `<= sym` either way.
 
     The fixpoint does not depend on the order the edges are relaxed in, so
     neither does the result.
@@ -1045,7 +1302,29 @@ def _projections(
     if prefer_low is None or not (prefer_low > 0.0).any():
         return sym, sym
     lam = 0.5 + 0.5 * np.clip(prefer_low, 0.0, 1.0)
-    return sym, relax(lam * low + (1.0 - lam) * high, 1.0)
+    mix = lam * low + (1.0 - lam) * high
+    if budget is None:
+        return sym, relax(mix, 1.0)
+    room = np.maximum(np.asarray(budget, dtype=np.float64), 0.0)
+    floor = relax(np.minimum(sym - room, h), -1.0)
+    if report is not None:
+        # What the floor was worth, exactly and for nothing: the metres it held
+        # the mixture up by, before the last relax spreads them. Read here rather
+        # than by running the whole chain again without a budget -- that costs
+        # six more relaxes on a 3 M-node graph and buys a number this one already
+        # tells. `held` is the honest counter: nodes the floor actually bound.
+        # Accumulated and not overwritten: `solve` runs this twice, the soft pull
+        # and the hard projection, and the budget binds at each. A dict that took
+        # only the last of them would report zero for a solve whose whole bound
+        # was spent softening the 10% step -- which is the `0.02 / 2.0` row of the
+        # block's sweep, where the hard stage binds nothing and Kirribilli moves
+        # four metres anyway.
+        lift = np.maximum(floor - mix, 0.0)
+        report["held"] = report.get("held", 0) + int((lift > 1e-9).sum())
+        report["held_p95"] = max(report.get("held_p95", 0.0), float(np.percentile(lift, 95)))
+        report["held_max"] = max(report.get("held_max", 0.0),
+                                 float(lift.max()) if lift.size else 0.0)
+    return sym, relax(np.maximum(mix, floor), 1.0)
 
 
 def _lipschitz(
@@ -1053,9 +1332,11 @@ def _lipschitz(
     edges: np.ndarray,
     limit: np.ndarray,
     prefer_low: np.ndarray | None = None,
+    budget: np.ndarray | None = None,
+    report: dict | None = None,
 ) -> np.ndarray:
     """The nearest profile that respects every edge's height budget."""
-    return _projections(h, edges, limit, prefer_low)[1]
+    return _projections(h, edges, limit, prefer_low, budget, report)[1]
 
 
 def _segments(ways, corridors, pts, way_of, station_h) -> RoadSurface:
