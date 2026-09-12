@@ -28,7 +28,7 @@ echo "worktree $WT ready $(date)"
 # 3. build
 cd $WT/pipeline
 echo "build start $(date)"
-uv run python -m sydney build --stage middle --retile --rebuild 2>&1
+uv run python -u -m sydney build --stage middle --retile --rebuild 2>&1
 rc=$?
 echo "build rc=$rc $(date)"
 [ $rc -eq 0 ] && echo "BUILD_DONE $SHA" || echo "BUILD_FAILED $rc"
