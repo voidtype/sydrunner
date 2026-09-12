@@ -359,6 +359,29 @@ def _pixel_enu(shape: tuple[int, int], origin_px: tuple[float, float], zoom: int
     return east.reshape(lon.shape), north.reshape(lon.shape)
 
 
+def _pixel_enu_block(window, origin_px: tuple[float, float], zoom: int):
+    """`_pixel_enu(..., sub=1)` over one rectangle of the raster, and no more.
+
+    The whole-raster form above is fine over a station's couple of hectares and
+    is not fine over `shoreline.built_drop`'s window, which at 60 km is the
+    entire 121 km extent -- 59 M pixels, and six float64 arrays of that length
+    at once is four gigabytes before a single point has been constructed. This
+    is the same arithmetic restricted to `(r0, r1, c0, c1)`, so a caller can
+    sweep the raster a block at a time.
+
+    **Bit-identical to the slice of the whole-raster form, by construction.**
+    At `sub=1` the pixel coordinate of column `c` is `c * 1.0 + 0.5` whether the
+    `arange` started at zero or at `c0`, and everything after it is elementwise.
+    """
+    r0, r1, c0, c1 = window
+    xx, yy = np.meshgrid(np.arange(c0, c1) * 1.0 + 0.5, np.arange(r0, r1) * 1.0 + 0.5)
+    n = float(terrain.TERRARIUM_PIXELS << zoom)
+    lon = (xx + origin_px[0]) / n * 360.0 - 180.0
+    lat = np.degrees(np.arctan(np.sinh(math.pi * (1.0 - 2.0 * (yy + origin_px[1]) / n))))
+    east, north = geo.lonlat_to_enu(lon.ravel(), lat.ravel())
+    return east.reshape(lon.shape), north.reshape(lon.shape)
+
+
 def built_mass(raw_shape, origin_px, zoom: int, footprints, heights) -> np.ndarray:
     """Coverage-weighted building height on the DSM's own pixel grid, metres.
 

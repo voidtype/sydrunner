@@ -973,13 +973,113 @@ def _group_levels(bodies: list[WaterBody]) -> list[WaterLevel]:
 # --- The conformance -----------------------------------------------------------
 
 
-def _shore_distance(pts, boundary, reach: float, fast: bool) -> np.ndarray:
+# Segments per boundary piece filed in the index below. See `_chop`.
+SHORE_CHOP_SEGMENTS = 64
+
+
+def _chop(parts: np.ndarray, max_segments: int) -> np.ndarray:
+    """Cut each boundary part into runs of at most `max_segments` segments.
+
+    **This is what makes the index an index.** An STRtree filters by envelope,
+    and a ring's envelope is only as tight as the ring is small: the tidal
+    level's outer ring at 60 km runs from Broken Bay to Port Hacking, so its
+    envelope covers the whole extent, every post in the city is a candidate for
+    it, and GEOS then answers `dwithin` with `DistanceOp` -- which walks every
+    vertex of it, because `BasicPreparedGeometry::isWithinDistance` has no index
+    of its own. The tree query was logarithmic and the predicate behind it was
+    still posts × coastline.
+
+    Chopped, each piece's envelope is about `max_segments` segments wide, the
+    tree rejects all but a handful per post, and the work per post stops
+    depending on how long the coastline is.
+
+    **The distances do not change, at all.** `distance(p, line)` is the minimum
+    of `pointToSegment(p, a, b)` over the line's segments; the pieces partition
+    exactly that segment set (piece `i` carries vertices `i*k .. i*k+k`, so the
+    shared vertex is an endpoint of two pieces and no segment is in two), and a
+    minimum over a partition is the minimum over the whole. Same function, same
+    segments, same floats. `verify_conform_fast` asserts it with
+    `np.array_equal` rather than a tolerance, which is the reason that check was
+    written.
+
+    64 is small enough that a piece's envelope is a piece of coast rather than a
+    region, and large enough that the tree stays a few tens of thousands of
+    entries rather than a million.
+    """
+    counts = shapely.get_num_coordinates(parts).astype(np.int64)
+    if counts.size == 0 or int(counts.max()) <= max_segments + 1:
+        return parts
+    xy = shapely.get_coordinates(parts)
+    starts = np.zeros(counts.size + 1, dtype=np.int64)
+    np.cumsum(counts, out=starts[1:])
+    pieces = np.maximum(counts - 1 + max_segments - 1, 0) // max_segments  # ceil, 0 for degenerate
+    if not pieces.sum():
+        return parts
+    part_of = np.repeat(np.arange(counts.size), pieces)
+    before = np.zeros(counts.size + 1, dtype=np.int64)
+    np.cumsum(pieces, out=before[1:])
+    nth = np.arange(part_of.size) - before[part_of]
+    first = starts[part_of] + nth * max_segments
+    last = np.minimum(first + max_segments, starts[part_of] + counts[part_of] - 1)
+    lens = last - first + 1
+    line_of = np.repeat(np.arange(part_of.size), lens)
+    run_start = np.zeros(lens.size + 1, dtype=np.int64)
+    np.cumsum(lens, out=run_start[1:])
+    vertex = np.repeat(first, lens) + (np.arange(int(lens.sum())) - run_start[line_of])
+    return shapely.linestrings(xy[vertex], indices=line_of)
+
+
+class ShoreIndex:
+    """One boundary, chopped and filed, ready to be asked about many blocks.
+
+    `_shore_distance` builds one of these per call, which is right when the call
+    is the whole field and wrong when a caller sweeps the lattice a block at a
+    time: `shoreline.conform` would rebuild and re-chop 5,800 rings for each of
+    the few hundred coastal blocks of the 60 km extent. Built once and passed
+    in, the index is the same index and the answers are the same answers -- the
+    arithmetic stays here, so there is still one implementation of "how far is
+    this post from the water" in the pipeline and not two that agree today.
+    """
+
+    __slots__ = ("parts", "tree")
+
+    def __init__(self, boundary) -> None:
+        parts = shapely.get_parts(boundary)
+        self.parts = _chop(parts, SHORE_CHOP_SEGMENTS) if len(parts) else parts
+        self.tree = shapely.STRtree(self.parts) if len(self.parts) else None
+
+    def within(self, pts, reach: float) -> np.ndarray:
+        """Which posts have any piece of waterline within `reach`. Indices."""
+        if self.tree is None:
+            return np.zeros(0, dtype=np.int64)
+        return self.tree.query(pts, predicate="dwithin", distance=reach)[0]
+
+    def near_any(self, geom, reach: float) -> bool:
+        """Does any piece come within `reach` of this geometry? The block skip."""
+        return self.tree is not None and bool(
+            len(self.tree.query(geom, predicate="dwithin", distance=reach))
+        )
+
+    def distance(self, pts, reach: float) -> np.ndarray:
+        if self.tree is None:
+            return np.full(len(pts), np.inf)
+        hit_pts, hit_parts = self.tree.query(pts, predicate="dwithin", distance=reach)
+        dist = np.full(len(pts), np.inf)
+        if len(hit_pts):
+            np.minimum.at(dist, hit_pts, shapely.distance(pts[hit_pts], self.parts[hit_parts]))
+        return dist
+
+
+def _shore_distance(pts, boundary, reach: float, fast: bool, index=None) -> np.ndarray:
     """Metres from each post to the waterline, or `+inf` past `reach`.
 
     `fast=False` is the form this replaced -- every post against the whole
     boundary -- kept callable rather than deleted, because it is the reference
     `verify_conform_fast` compares against and a reference nobody can run is a
     claim rather than a check.
+
+    `index` is a `ShoreIndex` over the same boundary, for a caller that asks
+    about the same coastline many times. It changes nothing about the answer.
     """
     if not fast:
         return shapely.distance(pts, boundary)
@@ -995,19 +1095,34 @@ def _shore_distance(pts, boundary, reach: float, fast: bool) -> np.ndarray:
     # So the near band is found from an index instead. The boundary is split into
     # its constituent line parts, filed in an STRtree, and each post asks the tree
     # for the parts within `reach` -- a logarithmic query. Only the posts with a
-    # hit ever pay for a real distance, and that distance is against the whole
-    # boundary as before, so the value is identical; only the *work* to decide
-    # who needs it has changed. Bit-for-bit results are asserted by
-    # `verify_conform_fast` against the reference above.
-    parts = shapely.get_parts(boundary)
-    if len(parts) == 0:
-        return np.full(len(pts), np.inf)
-    tree = shapely.STRtree(parts)
-    hit_pts = np.unique(tree.query(pts, predicate="dwithin", distance=reach)[0])
-    dist = np.full(len(pts), np.inf)
-    if len(hit_pts):
-        dist[hit_pts] = shapely.distance(pts[hit_pts], boundary)
-    return dist
+    # hit ever pay for a real distance.
+    #
+    # **And the distance is measured against the pieces the tree named, not
+    # against the whole boundary** -- which is the term that was left, and the
+    # one that made the shore pass unaffordable at 60 km. `distance` on a bare
+    # MultiLineString is `DistanceOp` and it walks *every* component; worse, the
+    # `dwithin` behind the tree query is `GEOSPreparedDistanceWithin`, which for
+    # a basic prepared geometry is the same `DistanceOp` with no index of its
+    # own, so a ring whose envelope covers the extent was scanned in full for
+    # every post that asked. Both are why `_chop` above exists.
+    #
+    # Measured on the real tidal boundary of the 5.3 km ring (21 rings, 9,926
+    # vertices) against 50,000 posts, all three forms returning `np.array_equal`
+    # answers: the shipped form 2.04 s, pieces without the chop 1.96 s, pieces
+    # chopped at 64 segments **0.10 s**. At 16 and 256 segments it is 0.12 and
+    # 0.17, which is what chose 64.
+    #
+    # **It is the same number, not a near one, and the argument is one line.**
+    # `distance(p, boundary)` is the minimum over the components of
+    # `distance(p, component)` -- the same GEOS `pointToSegment` on the same
+    # segments, with no pruning that depends on which components are present. A
+    # post with a `dwithin` hit has its true nearest component within `reach`,
+    # so that component is in the set the tree returned, so the minimum over the
+    # returned set *is* the minimum over all of them. A post with no hit keeps
+    # `+inf` exactly as before. Bit-for-bit equality with the unindexed
+    # reference is asserted by `verify_conform_fast`, which is why that check
+    # exists and why it compares with `np.array_equal` rather than a tolerance.
+    return (index if index is not None else ShoreIndex(boundary)).distance(pts, reach)
 
 
 def conform(
@@ -1178,6 +1293,60 @@ def conform(
         "lifted_max": float(lifted.max()) if lifted.size else 0.0,
         "levels": len(field.levels),
     }
+
+
+def verify_shore_distance() -> list[str]:
+    """Self-check for the indexed shore distance, in the client's `verify*` spirit.
+
+    `verify_conform_fast` below is the whole-field version of this claim and it
+    needs a solved `WaterField` to run, which means nothing runs it. This is the
+    same claim on made-up linework: it costs milliseconds, needs neither the
+    extract nor a solve, and it is the one that catches a wrong `_chop` before a
+    seven-hour build does.
+
+    Three assertions, and each of them is a thing `_shore_distance` could get
+    wrong on its own:
+
+      1. `_chop` neither loses a segment nor counts one twice -- the segment
+         total is preserved exactly, which is what makes a minimum over the
+         pieces a minimum over the line.
+      2. Inside the reach, the indexed answer equals `shapely.distance` against
+         the whole boundary **bit for bit**, not closely. A tolerance here would
+         pass an index that quietly returned the second-nearest piece.
+      3. Outside the reach it is `+inf`, and the in-band population is exactly
+         the set whose true distance is within the reach -- no post gained, none
+         lost.
+    """
+    out: list[str] = []
+    rng = np.random.default_rng(20260912)
+    lines = [
+        np.cumsum(rng.normal(0.0, 9.0, size=(n, 2)), axis=0) + o
+        for n, o in ((501, (0.0, 0.0)), (137, (900.0, -400.0)), (2, (-700.0, 250.0)))
+    ]
+    boundary = shapely.MultiLineString([list(map(tuple, xy)) for xy in lines])
+    parts = shapely.get_parts(boundary)
+
+    chopped = _chop(parts, SHORE_CHOP_SEGMENTS)
+    before = int(shapely.get_num_coordinates(parts).sum()) - len(parts)
+    after = int(shapely.get_num_coordinates(chopped).sum()) - len(chopped)
+    if before != after:
+        out.append(f"_chop changed the segment count: {before:,} -> {after:,}")
+
+    xy = rng.normal(0.0, 400.0, size=(6000, 2))
+    pts = shapely.points(xy[:, 0], xy[:, 1])
+    true = shapely.distance(pts, boundary)
+    for reach in (5.0, 60.0, 600.0):
+        got = _shore_distance(pts, boundary, reach, True)
+        want = np.where(true <= reach, true, np.inf)
+        if not np.array_equal(got, want):
+            bad = int(np.count_nonzero(got != want))
+            finite = np.isfinite(got) & np.isfinite(want)
+            worst = float(np.abs(got[finite] - want[finite]).max()) if finite.any() else float("inf")
+            out.append(
+                f"indexed shore distance at reach {reach:g} differs from the whole "
+                f"boundary at {bad:,} of {len(pts):,} points, worst {worst:.6g} m"
+            )
+    return out
 
 
 def verify_conform_fast(

@@ -146,6 +146,12 @@ SEA_LEVEL = 0.0
 
 EARTH_RADIUS = 6378137.0
 
+# Posts sampled off the DEM in one band, in `load` below. Purely a memory bound:
+# the sample is elementwise, so the band decides nothing about the answer. Four
+# million is ~32 MB a float64 array and a couple of hundred megabytes of
+# transient, against the 15 M posts of the 60 km lattice.
+_SAMPLE_BLOCK = 4_000_000
+
 
 def post_spacing() -> float:
     """Metres between lattice posts. 500 / 16 = 31.25, exactly representable."""
@@ -389,13 +395,30 @@ class Terrain:
         # interpolation exactly on the last post has a cell to sit in.
         reach = int(math.ceil(radius_m / config.TILE_SIZE) + 1) * config.TERRAIN_GRID
         idx = np.arange(-reach, reach + 1, dtype=np.float64)
-        east = (idx * spacing)[None, :].repeat(len(idx), axis=0)
-        north = (idx * spacing)[:, None].repeat(len(idx), axis=1)
+        coord = idx * spacing
+        n_side = idx.size
 
-        lon, lat = geo.enu_to_lonlat(east.ravel(), north.ravel())
-        px, py = _lonlat_to_pixel(lon, lat, zoom)
-        cx, cy = _offset_px(origin_px, px, py)
-        heights = _bilinear(dem, cx, cy).reshape(east.shape).astype(np.float32) - np.float32(base)
+        # A band of rows at a time. The sample is elementwise -- every post's
+        # height is a function of that post's own ENU and the DEM under it -- so
+        # the band is a memory decision and not a numerical one, and the values
+        # are the same to the bit whatever the band is. At 5.3 and 20 km it makes
+        # no difference worth having; at 60 km the one-shot form wanted eight
+        # float64 arrays of 15 M posts at once (ENU, geodetic, pixel, offset
+        # pixel) plus `_bilinear`'s four corner gathers, which is the better part
+        # of two gigabytes for an array that ends up 57 MB.
+        heights = np.empty((n_side, n_side), dtype=np.float32)
+        rows_per = max(1, _SAMPLE_BLOCK // n_side)
+        for r0 in range(0, n_side, rows_per):
+            r1 = min(r0 + rows_per, n_side)
+            east = coord[None, :].repeat(r1 - r0, axis=0)
+            north = coord[r0:r1, None].repeat(n_side, axis=1)
+            lon, lat = geo.enu_to_lonlat(east.ravel(), north.ravel())
+            px, py = _lonlat_to_pixel(lon, lat, zoom)
+            cx, cy = _offset_px(origin_px, px, py)
+            heights[r0:r1] = (
+                _bilinear(dem, cx, cy).reshape(east.shape).astype(np.float32) - np.float32(base)
+            )
+        del east, north, lon, lat, px, py, cx, cy
 
         stats = {
             "zoom": zoom,
