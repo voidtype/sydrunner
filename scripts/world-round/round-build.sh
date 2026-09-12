@@ -21,7 +21,8 @@ for f in far.bin far-cover.bin far-terrain.bin far-water.bin landmarks.glb index
 echo "snapshot done $(date): $(ls $R/before/tiles | wc -l) tile files"
 # 2. pinned worktree, world symlinked in
 git -C $MAIN worktree prune
-[ -d $WT ] || git -C $MAIN worktree add --detach $WT $SHA >/dev/null 2>&1 || { echo ABORT worktree; exit 1; }
+rm -rf $WT; git -C $MAIN worktree prune; git -C $MAIN worktree add --detach $WT $SHA >/dev/null 2>&1 || { echo ABORT worktree; exit 1; }
+git -C $WT rev-parse HEAD | grep -q "^$SHA" || { echo "ABORT worktree is not at $SHA"; exit 1; }
 for l in node_modules client/node_modules server/node_modules data; do rm -rf $WT/$l; ln -s $MAIN/$l $WT/$l; done
 rm -rf $WT/client/public/world; ln -s $W $WT/client/public/world
 echo "worktree $WT ready $(date)"
