@@ -13,6 +13,19 @@
         "--strictPort"
       ],
       "port": 5173
+    },
+    {
+      "name": "build-watch",
+      "//": "The live gauge for a running bake (scripts/build-watch.py): reads data/build-progress.json per request.",
+      "runtimeExecutable": "/Volumes/underbelly/Code/sydrunner/pipeline/.venv/bin/python",
+      "runtimeArgs": [
+        "/Volumes/underbelly/Code/sydrunner/scripts/build-watch.py",
+        "--port",
+        "8899",
+        "--file",
+        "/Volumes/underbelly/Code/sydrunner/data/build-progress.json"
+      ],
+      "port": 8899
     }
   ]
 }
