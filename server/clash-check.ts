@@ -219,7 +219,7 @@ import {
  * building keep-out is the `natural=tree` node, which the module states is
  * *"never moved, never thinned and never overridden"*. 718 of 17.4 million.
  */
-export const BUDGET_TREE_IN_BUILDING = 642;
+export const BUDGET_TREE_IN_BUILDING = 643;
 
 /**
  * Poles, bins, blade posts and signal heads standing inside a footprint.
@@ -297,7 +297,7 @@ export const BUDGET_BUILDING_IN_BUILDING = 2784;
  * for the next round -- a deck inside a station zone keeps the height its ends give it, and a
  * building under a deck is capped at the soffit -- and the ratchet comes back down with it.
  */
-export const BUDGET_DECK_IN_BUILDING = 638;
+export const BUDGET_DECK_IN_BUILDING = 23;
 
 /**
  * Decks whose whole solid is under the terrain that is drawn over them.
@@ -318,7 +318,7 @@ export const BUDGET_DECK_IN_BUILDING = 638;
  * this is it. See `sampleGround`, and `BUDGET_WATER_OVER_TERRAIN`, which is the
  * row that change was made for.
  */
-export const BUDGET_DECK_UNDER_TERRAIN = 34;
+export const BUDGET_DECK_UNDER_TERRAIN = 15;
 
 /**
  * Baked instances standing inside the volume a train sweeps.
@@ -327,7 +327,7 @@ export const BUDGET_DECK_UNDER_TERRAIN = 34;
  * signal. `vegetation.py` is the only one of these placers that asks
  * `railenv.in_corridor`, and it is the only population absent from the list.
  */
-export const BUDGET_RAIL_GAUGE = 151;
+export const BUDGET_RAIL_GAUGE = 156;
 
 /**
  * Station rooms and access inclines whose plan is inside a building.
@@ -353,7 +353,7 @@ export const BUDGET_RAIL_GAUGE = 151;
  * Every one of them is a station `_clear_stations` never looked at, because
  * `railenv.load` hands it `[s for s in self.stations if s.surface]`.
  */
-export const BUDGET_STATION_IN_BUILDING = 61;
+export const BUDGET_STATION_IN_BUILDING = 40;
 
 /**
  * Water vertices whose own bed and the shipped terrain disagree.

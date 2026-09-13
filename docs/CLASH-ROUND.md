@@ -177,3 +177,16 @@ Full middle-stage retile at bcdf131 with `carriageway.py` and the `merge.py` ded
 
 Every budget is set to its row. `BUILDING_IN_BUILDING`'s citywide fall was 57 %, against the
 four-tile estimate of 96 %: the terrace stock the proof used is where the blob case is worst.
+
+## The retile of 2026-09-13 (round three: shoreline, the bounded road sign, decks through station zones, buildings under decks, the cut ladder)
+
+| pair | round 2 | round 3 |
+|---|---:|---:|
+| `DECK_IN_BUILDING` | 638 | **23** |
+| `STATION_IN_BUILDING` | 61 | **40** |
+| `DECK_UNDER_TERRAIN` | 34 | **15** |
+| `RAIL_GAUGE` | 151 | 156 (+5, the rail bake on ground the shore pass moved) |
+| `TREE_IN_BUILDING` | 642 | 643 |
+| every other row | | unchanged |
+
+Overpass clearance 1,021 → 1,016 under 5 m. Every budget set to its row.
