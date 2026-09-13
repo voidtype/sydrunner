@@ -6825,9 +6825,13 @@ HAND_ASSERTED: list[tuple[str, str, str]] = [
     # terrain here too, and calling it elevated is what stopped anybody
     # noticing. The row now asserts what the bake measures, and section 4a
     # prints the conflict by name so it cannot become folklore.
-    ("Milsons Point", "surface",
-     "the Harbour Bridge approach viaduct, which the DEM buries by 4.4 m -- a "
-     "reported structure/ground conflict, not a quiet reclassification"),
+    # ...and since the round of 2026-09-13 it is elevated again, honestly: the
+    # bare-earth pass took the interchange roof out of the ground, the deck
+    # keeps its approaches' height through the station zone (decks.py), and
+    # the bake reads the conformed lattice, so the viaduct stands over the
+    # ground it is drawn over. The row asserts what the bake measures now.
+    ("Milsons Point", "elevated",
+     "the Harbour Bridge approach viaduct, over bare earth since RAIL-VERTICAL 3b/3f"),
     ("Meadowbank", "surface", "the bridge approach is beside it, not under it"),
     # ...and the row that pins the bug this started from. Chatswood was
     # `elevated` with its track 6.9 m under the grid, so the cutting carve
