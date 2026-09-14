@@ -706,6 +706,11 @@ HERO_JOIN_DROP_M = 0.02
 # 7.6 m ribbon needs about 45 m; a way that has not got onto the deck by this
 # distance is running along the edge, not leaving across it.
 HERO_JOIN_REACH_M = 150.0
+# How near another deck's running surface a parapet may stand, vertically, and
+# still be standing *on* that deck. Under it the barrier is between two
+# carriageways that share one surface, and it is not built. See
+# `_shared_parapets`.
+PARAPET_SHARED_DY_M = 1.0
 
 SLOT_DECK = "road_asphalt"
 SLOT_STRUCTURE = "footpath_concrete"
@@ -796,6 +801,21 @@ class DeckRun:
     _left: np.ndarray | None = field(default=None, repr=False, compare=False)
     _para: np.ndarray | None = field(default=None, repr=False, compare=False)
     _tops: np.ndarray | None = field(default=None, repr=False, compare=False)
+    # (2, N) per-edge multipliers on `parapet`, row 0 the `+left` edge. None is
+    # all ones. Set by `_shared_parapets`; read through `parapet_on`.
+    _para_mask: np.ndarray | None = field(default=None, repr=False, compare=False)
+
+    def parapet_on(self, side: float) -> np.ndarray:
+        """`parapet` on one edge, zero where that edge stands on another deck.
+
+        `side` is the sign `prisms` and `_emit_run` give `left`. Both read the
+        barrier through this and nothing else, for `parapet`'s own reason: two
+        answers to how tall a barrier is is how a wall ends up where nothing is
+        drawn.
+        """
+        if self._para_mask is None:
+            return self.parapet
+        return self.parapet * self._para_mask[0 if side > 0 else 1]
 
     @property
     def frames(self) -> np.ndarray:
@@ -1061,7 +1081,10 @@ class DeckNetwork:
             if (step > MAX_STEP_M).any():
                 runs[i] = _restation_steep(run, terrain)
                 restationed += 1
+        # After the restation, because the mask is per station of the final one.
+        shared_edges = _shared_parapets(runs, hero)
         stats = {
+            "shared_parapet_stations": shared_edges,
             "restationed_runs": restationed,
             "cliff_segments": cliffs,
             "bridge_ways": len(bridges),
@@ -1195,20 +1218,23 @@ class DeckNetwork:
                 # inside the wedge rather than around it. Under `MAX_STEP_M` it
                 # is a thing a body steps over anyway and a prism for it is bytes
                 # that can only ever be wrong. See `DeckRun.parapet`.
-                wall = min(float(para[i]), float(para[i + 1]))
-                if wall >= MAX_STEP_M:
-                    for side in (1.0, -1.0):
-                        off = side * (hw - PARAPET_THICK_M * 0.5)
-                        out.append(
-                            Prism(
-                                _mitred_ring(
-                                    run.pts, left, i, PARAPET_THICK_M * 0.5, offset=off
-                                ),
-                                float(top),
-                                wall,
-                                "parapet",
-                            )
+                # Per edge, since an edge standing on another deck has none.
+                for side in (1.0, -1.0):
+                    edge = para if run._para_mask is None else run.parapet_on(side)
+                    wall = min(float(edge[i]), float(edge[i + 1]))
+                    if wall < MAX_STEP_M:
+                        continue
+                    off = side * (hw - PARAPET_THICK_M * 0.5)
+                    out.append(
+                        Prism(
+                            _mitred_ring(
+                                run.pts, left, i, PARAPET_THICK_M * 0.5, offset=off
+                            ),
+                            float(top),
+                            wall,
+                            "parapet",
                         )
+                    )
         return out
 
     # --- Emission -------------------------------------------------------------
@@ -1443,6 +1469,97 @@ def _join_hero(line: LineString, piece: LineString, exits) -> tuple[np.ndarray, 
     if not joined:
         return pts, False
     return np.asarray(substring(line, lo, hi).coords, dtype=np.float64), True
+
+
+def _shared_parapets(runs: list, hero=None) -> int:
+    """Take the barrier off every edge that stands on another deck.
+
+    **A parapet is a barrier between a deck and the air, so an edge with a deck
+    under it has none.** OSM draws a divided carriageway as two centrelines, and
+    at Milsons Point the Bradfield Highway's are eight metres apart with ribbons
+    7.6 m either side of each -- so the southbound carriageway's western parapet
+    runs down the middle of the northbound lane. While that approach lay on its
+    ground, under `PARAPET_MIN_CLEARANCE_M`, no parapet was built and nobody saw
+    it (`server/ramp-check.ts` routes 4.5 m off the centreline for the stretch
+    where one was). Joined to the hero deck it stands 7-9 m up, every station
+    earns a barrier, and a car driving the lane off the bridge met a 1.05 m wall
+    across its bonnet at E 251 N 2414 -- the sixth bug's fix, stopped by this.
+
+    So per station and per edge: the parapet's own centre line is tested against
+    every other run's ribbon (inside it by more than the barrier's thickness) and
+    the hero deck's plan, and where the surface there is within
+    `PARAPET_SHARED_DY_M` of this deck's, that edge's barrier is zero at that
+    station. Two things are deliberately not done. A deck *over* another by more
+    than that keeps its barrier -- a flyover's edge is an edge. And the test is
+    strictly inside, so two runs meeting end to end at a junction keep their
+    barriers along the edges they continue.
+
+    Returns how many edge stations lost a barrier. Sets `DeckRun._para_mask` only
+    on runs where one did, so everywhere else is exactly the arrays it was.
+    """
+    from collections import defaultdict
+
+    cell = CROSS_CELL_M
+    bins: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
+    for r_i, run in enumerate(runs):
+        p = run.pts
+        hw = run.half_width
+        for k in range(len(p) - 1):
+            x0, y0 = p[k]
+            x1, y1 = p[k + 1]
+            for c in _cells(min(x0, x1) - hw, min(y0, y1) - hw, max(x0, x1) + hw, max(y0, y1) + hw, cell):
+                bins[c].append((r_i, k))
+
+    removed = 0
+    for r_i, run in enumerate(runs):
+        n = len(run.pts)
+        if n < 2:
+            continue
+        para = run.parapet
+        live = np.flatnonzero(para > 0.0)
+        if live.size == 0:
+            continue
+        mask = np.ones((2, n))
+        left = run.frames
+        for si, side in enumerate((1.0, -1.0)):
+            q = run.pts + left * (side * (run.half_width - PARAPET_THICK_M * 0.5))
+            on_hero = np.zeros(n, dtype=bool)
+            if hero is not None:
+                hs, ht = hero.frame(q)
+                on_hero = (
+                    (np.abs(ht) <= hero.half_width - PARAPET_THICK_M)
+                    & (np.abs(hs) <= hero.half_length)
+                    & (np.abs(hero.surface(hs) - run.deck_y) <= PARAPET_SHARED_DY_M)
+                )
+            for k in live:
+                if on_hero[k]:
+                    mask[si, k] = 0.0
+                    continue
+                x, y = float(q[k, 0]), float(q[k, 1])
+                for c in _cells(x, y, x, y, cell):
+                    hit = False
+                    for o_i, ok in bins.get(c, ()):
+                        if o_i == r_i:
+                            continue
+                        o = runs[o_i]
+                        a, b = o.pts[ok], o.pts[ok + 1]
+                        ab = b - a
+                        den = float(ab @ ab)
+                        t = 0.0 if den <= 0.0 else min(1.0, max(0.0, float((q[k] - a) @ ab) / den))
+                        foot = a + t * ab
+                        if math.hypot(x - foot[0], y - foot[1]) >= o.half_width - PARAPET_THICK_M:
+                            continue
+                        oy = float(o.deck_y[ok] + t * (o.deck_y[ok + 1] - o.deck_y[ok]))
+                        if abs(oy - float(run.deck_y[k])) <= PARAPET_SHARED_DY_M:
+                            hit = True
+                            break
+                    if hit:
+                        mask[si, k] = 0.0
+                        break
+        if (mask < 1.0).any():
+            removed += int((mask[:, live] < 1.0).sum())
+            object.__setattr__(run, "_para_mask", mask)
+    return removed
 
 
 def _hero_join_heights(sp: np.ndarray, hw: float, hero) -> np.ndarray:
@@ -2497,6 +2614,9 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
         # no end caps, because consecutive segments abut and a barrier run's
         # two ends have grown down to nothing.
         for side in (1.0, -1.0):
+            ps = para if run._para_mask is None else run.parapet_on(side)
+            if ps[i] <= 0.01 and ps[j] <= 0.01:
+                continue
             out = left[i] * side
             outer = side * hw
             inner = side * (hw - PARAPET_THICK_M)
@@ -2504,16 +2624,16 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
                 _quad(
                     struct,
                     edge_pt(i, off / hw, dy[i]), edge_pt(j, off / hw, dy[j]),
-                    edge_pt(j, off / hw, dy[j] + para[j]),
-                    edge_pt(i, off / hw, dy[i] + para[i]),
+                    edge_pt(j, off / hw, dy[j] + ps[j]),
+                    edge_pt(i, off / hw, dy[i] + ps[i]),
                     (nrm[0], 0.0, -nrm[1]), origin,
                 )
             _quad(
                 struct,
-                edge_pt(i, inner / hw, dy[i] + para[i]),
-                edge_pt(j, inner / hw, dy[j] + para[j]),
-                edge_pt(j, outer / hw, dy[j] + para[j]),
-                edge_pt(i, outer / hw, dy[i] + para[i]),
+                edge_pt(i, inner / hw, dy[i] + ps[i]),
+                edge_pt(j, inner / hw, dy[j] + ps[j]),
+                edge_pt(j, outer / hw, dy[j] + ps[j]),
+                edge_pt(i, outer / hw, dy[i] + ps[i]),
                 (0.0, 1.0, 0.0), origin,
             )
 
@@ -2683,6 +2803,44 @@ def verify_decks() -> list[str]:
     failures += _verify_touchdown_taper()
     failures += _verify_parapet_ramp()
     failures += _verify_hero_join()
+    failures += _verify_shared_parapets()
+    return failures
+
+
+def _verify_shared_parapets() -> list[str]:
+    """Two carriageways sharing a surface lose the barrier between them, and only it.
+
+    Three parallel runs 60 m long, 10 m over flat ground: A, and B eight metres to
+    one side at the same height -- the Milsons Point spacing, with ribbons 7.6 m
+    wide that overlap -- and C eight metres to the other side and 5 m higher.
+    A's edge toward B stands on B and must lose its barrier; A's edge toward C
+    stands over air under a flyover and keeps it; C keeps both.
+    """
+    failures: list[str] = []
+    n = 11
+    xs = np.linspace(0.0, 60.0, n)
+
+    def run(y_off: float, height: float) -> DeckRun:
+        return DeckRun(
+            road=None,
+            pts=np.column_stack((xs, np.full(n, y_off))),
+            deck_y=np.full(n, height),
+            ground=np.zeros(n),
+            half_width=7.6,
+        )
+
+    a, b, c = run(0.0, 10.0), run(8.0, 10.0), run(-8.0, 15.0)
+    removed = _shared_parapets([a, b, c])
+    if removed == 0 or a._para_mask is None:
+        return ["two carriageways sharing a surface both kept the barrier between them"]
+    # `left` of a run along +x is +y, so `side = +1` is the edge toward B.
+    mid = n // 2
+    if a.parapet_on(1.0)[mid] > 0.0:
+        failures.append("the barrier between two carriageways on one surface is still built")
+    if a.parapet_on(-1.0)[mid] <= 0.0:
+        failures.append("a deck lost the barrier on an edge that stands under a flyover, not on it")
+    if c._para_mask is not None and (c.parapet_on(1.0)[mid] <= 0.0 or c.parapet_on(-1.0)[mid] <= 0.0):
+        failures.append("a flyover 5 m over another deck lost its edge barrier")
     return failures
 
 

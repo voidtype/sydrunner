@@ -1630,34 +1630,49 @@ def _gap_length(gaps, side: float, lo: float, hi: float) -> float:
     return total
 
 
-def _end_barrier(b: _Builder, at, enu, prisms: list[Prism], s_end: float, end: float, level, half_w: float) -> None:
-    """A parapet across the deck at a ramp's last station, drawn and solid.
+# How deep, along the deck, the barrier across a ramp's end is. **Deep because a
+# car is fast, not because a barrier is thick**: `driving.DRIVE_TOP_SPEED` is 44
+# m/s, 0.73 m a tick at 60 Hz, and the first barrier here was the edge rail's
+# 0.45 m -- `server/ramp-check.ts`'s NorthSpur drove through it in one tick and
+# off the end. Four ticks of travel, drawn as the granite block it is.
+BRIDGE_END_BARRIER_DEPTH = 3.0
 
-    The same steel, height and thickness as the edge parapets, standing on the
-    last 0.45 m of the ramp, so it reads as the rail turning the corner rather
-    than as a new object. `landmark-audit` tells it from a rail by its width: an
-    edge rail is 0.5 m across the axis and this is the whole deck.
+
+def _end_barrier(b: _Builder, at, enu, prisms: list[Prism], s_end: float, end: float, level, half_w: float) -> None:
+    """A granite block across the deck at a ramp's last station, drawn and solid.
+
+    The edge parapets' height, the full deck width, and `BRIDGE_END_BARRIER_DEPTH`
+    back from the end, standing on the ramp; every face drawn, so nothing about
+    it is an invisible wall. `landmark-audit` tells it from a rail by its width:
+    an edge rail is 0.5 m across the axis and this is the whole deck.
     """
-    thick = 0.45
-    s_out, s_in = s_end, s_end - end * thick
+    depth = BRIDGE_END_BARRIER_DEPTH
+    h = BRIDGE_PARAPET_HEIGHT
+    s_out, s_in = s_end, s_end - end * depth
+    y_in, y_out = level(s_in), level(s_out)
     toward = at(s_end + end, 0.0, 0.0) - at(s_end, 0.0, 0.0)
+    sideways = at(s_end, 1.0, 0.0) - at(s_end, 0.0, 0.0)
     for s_face, normal in ((s_in, -toward), (s_out, toward)):
         y = level(s_face)
         b.face(
-            "landmark_steel",
-            (at(s_face, -half_w, y), at(s_face, half_w, y),
-             at(s_face, half_w, y + BRIDGE_PARAPET_HEIGHT), at(s_face, -half_w, y + BRIDGE_PARAPET_HEIGHT)),
+            "landmark_granite",
+            (at(s_face, -half_w, y), at(s_face, half_w, y), at(s_face, half_w, y + h), at(s_face, -half_w, y + h)),
             normal,
         )
-    y_in, y_out = level(s_in), level(s_out)
+    for t_face, normal in ((-half_w, -sideways), (half_w, sideways)):
+        b.face(
+            "landmark_granite",
+            (at(s_in, t_face, y_in), at(s_out, t_face, y_out), at(s_out, t_face, y_out + h), at(s_in, t_face, y_in + h)),
+            normal,
+        )
     b.face(
-        "landmark_steel",
-        (at(s_in, -half_w, y_in + BRIDGE_PARAPET_HEIGHT), at(s_in, half_w, y_in + BRIDGE_PARAPET_HEIGHT),
-         at(s_out, half_w, y_out + BRIDGE_PARAPET_HEIGHT), at(s_out, -half_w, y_out + BRIDGE_PARAPET_HEIGHT)),
+        "landmark_granite",
+        (at(s_in, -half_w, y_in + h), at(s_in, half_w, y_in + h),
+         at(s_out, half_w, y_out + h), at(s_out, -half_w, y_out + h)),
         (0.0, 1.0, 0.0),
     )
     mid = (s_in + s_out) * 0.5
-    prisms.append(Prism(_rect_enu(enu, mid, 0.0, thick, BRIDGE_DECK_WIDTH), level(mid), BRIDGE_PARAPET_HEIGHT, "parapet"))
+    prisms.append(Prism(_rect_enu(enu, mid, 0.0, depth, BRIDGE_DECK_WIDTH), max(y_in, y_out), h, "parapet"))
 
 
 def _rect_local(at, s: float, t: float, along: float, across: float) -> list[tuple[float, float]]:
