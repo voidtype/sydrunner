@@ -55,7 +55,7 @@ comm -23 $L/tiles-before.txt $L/tiles-after.txt > $L/tiles-gone.txt
   for f in $W/hexes/*; do b=$(basename $f); cmp -s $R/before/hexes/$b $f || echo "hexes/$b"; done;
   for f in $W/collision/*; do b=$(basename $f); cmp -s $R/before/collision/$b $f || echo "collision/$b"; done;
   for f in far.bin far-cover.bin far-terrain.bin far-water.bin landmarks.glb street-names.bin suburbs.json; do cmp -s $R/before/$f $W/$f || echo $f; done; } | sort -u > $R/publish-keys.txt
-{ grep -E "^tiles/.*\.(lanes|terr|pow|cars)\.bin$" $R/publish-keys.txt; grep -E "^collision/" $R/publish-keys.txt; grep -vE "^(tiles|regions|hexes|collision)/" $R/publish-keys.txt; echo root.json; echo index.json; } | sort -u > $R/box-files.txt
+{ grep -E "^tiles/.*\.(lanes|terr|pow|cars)\.bin$" $R/publish-keys.txt; grep -E "^collision/" $R/publish-keys.txt; grep -E "^hexes/" $R/publish-keys.txt; grep -vE "^(tiles|regions|hexes|collision)/" $R/publish-keys.txt; echo root.json; echo index.json; } | sort -u > $R/box-files.txt
 echo "publish keys: $(wc -l < $R/publish-keys.txt); box files: $(wc -l < $R/box-files.txt); tiles changed $(wc -l < $L/tiles-changed.txt) new $(wc -l < $L/tiles-new.txt) gone $(wc -l < $L/tiles-gone.txt)"
 echo "== summary $(date)"
 for f in $L/*.log; do n=$(basename $f .log); tail -1 $f | cut -c1-160 | sed "s/^/$n: /"; done
