@@ -600,7 +600,13 @@ def cmd_build(args: argparse.Namespace) -> int:
     # and Sydney Tower's published 309 m is measured from the footpath outside
     # Westfield rather than from any datum.
     print("  building the hero landmarks ...")
-    marks = landmarks.build_all(terrain, anchors)
+    # Where the Bradfield Highway and the Cahill leave the hero deck sideways,
+    # read once and handed to both passes that need it: the landmark opens its
+    # parapet there and the deck solve pins the carriageway to it. See
+    # `decks.py`'s sixth bug.
+    hero_exits = decks.hero_deck_exits(anchors, roads)
+    print(f"    {len(hero_exits)} carriageway(s) leave the hero deck across an edge")
+    marks = landmarks.build_all(terrain, anchors, hero_exits)
     landmark_prisms = landmarks.prisms_by_tile(marks)
     _report_landmarks(marks, terrain)
 
@@ -619,8 +625,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     # it. Neither this nor the landmarks reads a building, so the move costs
     # nothing else.
     print("  solving the bridge decks ...")
+    # The hero deck's running surface, as one object read by the deck solve (for
+    # the joins) and by the lane graph (for the traffic over it). See `lanes.HeroDeck`.
+    hero_deck = lanes.HeroDeck(anchors, decks.hero_bridge_zone(anchors, zones), terrain)
     deck_network = decks.DeckNetwork.load(
-        stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones), roads
+        stage.radius_m, terrain, decks.hero_bridge_zone(anchors, zones), roads,
+        hero=hero_deck, exits=hero_exits,
     )
     _report_decks(deck_network)
 
@@ -755,7 +765,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         terrain,
         street_network.roads,
         deck_network,
-        lanes.HeroDeck(anchors, decks.hero_bridge_zone(anchors, zones), terrain),
+        hero_deck,
         signal_nodes,
         street_network,
         parking_network,
@@ -4440,7 +4450,9 @@ def _deck_prisms(bridge_audit: dict, anchor: list[float]) -> list[tuple[float, f
                 and abs(height - rail_h) < 0.1
                 and abs(base - deck_level(mid)) <= 1.0
             ):
-                rails.append((float(s.min()), float(s.max()), top))
+                # With the edge it stands on, by the sign of `across`: the
+                # manifest states each edge's exits separately.
+                rails.append((float(s.min()), float(s.max()), top, 1.0 if float(t.mean()) > 0.0 else -1.0))
     return sorted(deck), sorted(rails)
 
 
@@ -4678,15 +4690,36 @@ def cmd_landmark_audit(args: argparse.Namespace) -> int:
         # into the edge is stopped rather than stepping into the harbour. They
         # can still jump it, and falling 49 m into Port Jackson is a feature --
         # `world/wading.ts` has rules for what happens next.
-        print(
-            f"  {len(rails)} parapet volumes, {a['parapet_height_m']:.2f} m,"
-            f" against {2 * len(segs)} expected (two a segment)"
-        )
-        if len(rails) < 2 * len(segs):
-            failures.append(
-                f"the deck carries {len(rails)} parapet volumes against"
-                f" {2 * len(segs)} deck segments; a player can walk off the side"
+        #
+        # **Per edge and by length, not by count**, since the deck opens its
+        # parapet where a carriageway leaves it: a count of two a segment cannot
+        # tell a stated exit from a hole, and a length against the manifest's own
+        # `parapet_gap_*_m` can. See `decks.hero_deck_exits`.
+        def _union(spans: list[tuple[float, float]]) -> float:
+            total, cur = 0.0, None
+            for lo, hi in sorted(spans):
+                if cur is None or lo > cur[1] + DECK_GAP_TOLERANCE_M:
+                    if cur is not None:
+                        total += cur[1] - cur[0]
+                    cur = [lo, hi]
+                else:
+                    cur[1] = max(cur[1], hi)
+            return total + (cur[1] - cur[0] if cur is not None else 0.0)
+
+        print(f"  {len(rails)} parapet volumes, {a['parapet_height_m']:.2f} m")
+        deck_len = sum(hi - lo for lo, hi in covered)
+        for side, key in ((-1.0, "parapet_gap_neg_m"), (1.0, "parapet_gap_pos_m")):
+            got = _union([(lo, hi) for lo, hi, _top, sd in rails if sd == side])
+            opened = float(a.get(key, 0.0))
+            print(
+                f"    edge {side:+.0f}: {got:,.1f} m of parapet on {deck_len:,.1f} m of deck,"
+                f" {opened:,.1f} m opened for carriageways leaving it"
             )
+            if got < deck_len - opened - 2.0:
+                failures.append(
+                    f"the deck's {side:+.0f} edge carries {got:,.1f} m of parapet against"
+                    f" {deck_len - opened:,.1f} m it should; a player can walk off the side"
+                )
 
     # --- 6. Suppression, end to end.
     print("\nsuppression")

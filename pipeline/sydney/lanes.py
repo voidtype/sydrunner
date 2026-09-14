@@ -484,7 +484,51 @@ class HeroDeck:
         self._zone = prep(coverage)
         self._bounds = coverage.bounds
         self._terrain = terrain
+        self._across = _across
+        self._half_w = half_w
         self.covered = 0
+
+    # --- The frame, for the decks that join this one ------------------------
+    #
+    # `decks.DeckNetwork` pins a carriageway that leaves this deck sideways to
+    # the height of this deck (see `decks.hero_deck_exits`), and it asks *this*
+    # object for that height rather than rebuilding the profile a fourth time.
+    # Vectorised, and without the ground clamp `height()` carries: a join is only
+    # ever pinned over the level deck, 49 m up, where the clamp is inert.
+
+    @property
+    def along(self) -> np.ndarray:
+        return self._along
+
+    @property
+    def half_width(self) -> float:
+        return self._half_w
+
+    @property
+    def half_length(self) -> float:
+        """Half the level deck, the published 1,149 m. The ramps are beyond it."""
+        return self._half_len
+
+    def frame(self, pts: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """`(s, t)` of ENU points: along the pylon axis, and across it."""
+        rel = np.asarray(pts, dtype=np.float64).reshape(-1, 2) - self._centre
+        return rel @ self._along, rel @ self._across
+
+    def surface(self, s: np.ndarray) -> np.ndarray:
+        """The running surface at axis stations `s`, level deck and ramps."""
+        over = np.abs(np.asarray(s, dtype=np.float64)) - self._half_len
+        return self._deck_y - self._grade * np.clip(over, 0.0, self._reach)
+
+    def on_deck(self, east: float, north: float) -> bool:
+        """Inside the deck's own drawn width, as opposed to the zone's margin.
+
+        `covers()` is the zone plus the ramps, and the zone is the deck grown by
+        `decks.SUPPRESS_MARGIN_M` either side. That margin was only ever air, so
+        it did not matter who answered for it -- until a joining deck was pinned
+        across it. See `_HeightField._solve`.
+        """
+        s, t = self.frame(np.array([east, north]))
+        return bool(abs(t[0]) <= self._half_w and abs(s[0]) <= self._half_len + self._reach)
 
     def covers(self, east: float, north: float) -> bool:
         # The box first. This runs on every vertex of every bridge way in the
@@ -764,6 +808,22 @@ class _HeightField:
         runs = self._runs.get(_osm_id(road.osm_id), ())
         for i, (e, n) in enumerate(pts):
             if road.bridge and self._hero is not None and self._hero.covers(float(e), float(n)):
+                # **The deck's own width is the hero's; the zone's margin belongs
+                # to whichever deck is actually there.** A carriageway that leaves
+                # the Harbour Bridge sideways crosses the eight metres of margin
+                # on a generic deck pinned to the hero's height at the edge and
+                # already descending by the time it reaches the zone's boundary
+                # -- see `decks.hero_deck_exits`. Answered by the hero, the lane
+                # stayed at 49 m AHD to the boundary and then stepped down onto
+                # the solved run: 13.98 to 16.26 m in one segment, measured on
+                # build 1789283139. The reach is the run's own ribbon and no more,
+                # so a margin point with no run beside it keeps the hero's answer.
+                if runs and not self._hero.on_deck(float(e), float(n)):
+                    y = _deck_height(runs, float(e), float(n), reach=_HERO_MARGIN_REACH_M)
+                    if y is not None:
+                        out[i] = y
+                        self.stats["deck_points"] += 1
+                        continue
                 out[i] = self._hero.height(float(e), float(n))
                 self.stats["hero_points"] += 1
                 continue
@@ -780,7 +840,14 @@ class _HeightField:
         return out
 
 
-def _deck_height(runs: list, east: float, north: float) -> float | None:
+# How far from a run's centreline a lane point in the hero zone's margin may be
+# and still take that run's height: a motorway ribbon's half width
+# (`decks._half_width` is 7.6 m) plus the two metres a lane is offset. Past it the
+# point is not on that deck. See `_HeightField._solve`.
+_HERO_MARGIN_REACH_M = 12.0
+
+
+def _deck_height(runs: list, east: float, north: float, reach: float = 60.0) -> float | None:
     """`DeckRun.deck_y` at the foot of the nearest station segment."""
     best_d = float("inf")
     best_y = None
@@ -799,7 +866,7 @@ def _deck_height(runs: list, east: float, north: float) -> float | None:
             best_y = float(run.deck_y[k] + t[k] * (run.deck_y[k + 1] - run.deck_y[k]))
     # Past about a half-tile the nearest run is a different bridge entirely and
     # its height says nothing about this point.
-    return best_y if best_d < 60.0 else None
+    return best_y if best_d < reach else None
 
 
 # --- The ways block -----------------------------------------------------------
