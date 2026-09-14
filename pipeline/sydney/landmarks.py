@@ -1167,13 +1167,30 @@ def _bridge_chords(sea: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return s, upper, lower
 
 
-def build_bridge(anchors: dict[str, Anchor], terrain) -> Landmark:
+def build_bridge(anchors: dict[str, Anchor], terrain, exits=()) -> Landmark:
     """The Harbour Bridge: two arch trusses, a walkable deck, four pylons.
 
     The order of construction is the order the real thing is read in from a
     kilometre away: the arch first, because it is the whole silhouette; then the
     deck it hangs, because that is what the player stands on; then the pylons,
     which are what make it Sydney's bridge rather than a bridge.
+
+    **The deck is a road, so it has to let the road off it.** The owner, at the
+    north end over Fitzroy Street: *"this is the north end of the bridge, it needs
+    to connect to the road"*. The pylon frame this is built in runs 4.3 degrees
+    east of the carriageways OSM maps, so north of the arch the Bradfield Highway
+    and the Cahill Expressway cross the deck's western edge (s 420-466 on build
+    1789283139) and curve away to Milsons Point, while this deck runs straight on
+    to its ramp. Two things follow, and neither touches the arch, the pylons or
+    the 49.0 m AHD:
+
+      * the parapet is **opened** over exactly the stretch of each edge a
+        leaving carriageway's ribbon crosses (`exits`, from
+        `decks.hero_deck_exits`) -- the generic deck that carries it on is pinned
+        to this deck's surface there, by `decks.DeckNetwork`;
+      * a ramp that stops short of the ground gets a **barrier across its end**
+        (`_end_barrier`). The granite abutment was always there; what was not
+        was anything to stop a car driving off the top of it.
     """
     sea = -terrain.base_elevation
     centre, along, across = _bridge_frame(anchors)
@@ -1313,13 +1330,17 @@ def build_bridge(anchors: dict[str, Anchor], terrain) -> Landmark:
     # each end. `_deck_run` emits the box, the parapets, the piers and the
     # collision segments for a run, so the level deck and the ramps differ only
     # in the level function handed to it.
+    # Where the parapet opens: (edge sign, s from, s to), in the frame `at` uses.
+    gaps = [(float(e.side), float(e.gap[0]), float(e.gap[1])) for e in exits]
+
     def level(_s: float) -> float:
         return deck_y
 
-    _deck_run(b, at, enu, ground, prisms, -half_len, half_len, level, 25.0, soffit, half_w, sea)
+    _deck_run(b, at, enu, ground, prisms, -half_len, half_len, level, 25.0, soffit, half_w, sea, gaps)
 
     ramp_ends: dict[str, float] = {}
     ramp_clear: dict[str, float] = {}
+    barriers = {"south": 0.0, "north": 0.0}
     for end in (-1.0, 1.0):
         s0 = end * half_len
         run, clearance = _ramp_end(ground, s0, end, deck_y)
@@ -1331,7 +1352,7 @@ def build_bridge(anchors: dict[str, Anchor], terrain) -> Landmark:
             return deck_y - BRIDGE_RAMP_GRADE * abs(s - _s0)
 
         lo, hi = (s0 - run, s0) if end < 0 else (s0, s0 + run)
-        _deck_run(b, at, enu, ground, prisms, lo, hi, ramp, 6.0, None, half_w, sea)
+        _deck_run(b, at, enu, ground, prisms, lo, hi, ramp, 6.0, None, half_w, sea, gaps)
 
         # The abutment. Zero-height on the southern side, where the descending
         # deck genuinely does meet the ground in The Rocks; a real retaining wall
@@ -1344,6 +1365,12 @@ def build_bridge(anchors: dict[str, Anchor], terrain) -> Landmark:
             ground(s_end + end * 6.0) - 3.0,
             y_end,
         )
+        # And where that wall is a wall, the deck on top of it ends in a barrier
+        # rather than an edge. Measured on build 1789283139: 10.70 m from the
+        # last asphalt to Fitzroy Street, and nothing across it.
+        if clearance > 0.5:
+            _end_barrier(b, at, enu, prisms, s_end, end, ramp, half_w)
+            barriers[side] = 1.0
 
     # --- The four pylons.
     pylon_s = []
@@ -1382,6 +1409,13 @@ def build_bridge(anchors: dict[str, Anchor], terrain) -> Landmark:
         "axis_north": float(along[1]),
         "deck_width_m": BRIDGE_DECK_WIDTH,
         "parapet_height_m": BRIDGE_PARAPET_HEIGHT,
+        # How much of each edge's parapet is opened for a carriageway leaving the
+        # deck, by the sign of `across` -- so `landmark-audit` can tell an exit
+        # from a hole. And whether each ramp ends in a barrier.
+        "parapet_gap_neg_m": _gap_length(gaps, -1.0, -half_len - ramp_ends["south"], half_len + ramp_ends["north"]),
+        "parapet_gap_pos_m": _gap_length(gaps, 1.0, -half_len - ramp_ends["south"], half_len + ramp_ends["north"]),
+        "end_barrier_south": barriers["south"],
+        "end_barrier_north": barriers["north"],
     }
     return Landmark("harbour_bridge", (float(centre[0]), float(centre[1])), b.parts, prisms, audit)
 
@@ -1405,7 +1439,10 @@ def _ramp_end(ground, s0: float, end: float, deck_y: float) -> tuple[float, floa
     that ridge -- and `build_bridge` closes the remaining 8 m with a granite
     abutment. That is what the end of a bridge looks like, and it is honest about
     where this model stops: the approach roads themselves are the streets layer's
-    business.
+    business. **And it is a barrier, not an edge**: a ramp that returns clearance
+    here gets `_end_barrier` across it, because the roads do not leave by this end
+    -- they leave across the western edge, where `build_bridge` opens the parapet
+    -- and a deck nobody drives off must stop the car that tries.
 
     Returns (run in metres, clearance still remaining at the end).
     """
@@ -1436,8 +1473,12 @@ def _deck_run(
     soffit_flat: float | None,
     half_w: float,
     sea: float,
+    gaps=(),
 ) -> None:
     """One continuous stretch of deck: box, parapets, supports, collision.
+
+    `gaps` opens the parapet: `(edge sign, s from, s to)` triples, see
+    `build_bridge` and `_parapet_spans`.
 
     `seg` is the segment length and it is the only thing that differs between
     the level deck and the ramps, for a reason that is gameplay rather than
@@ -1480,29 +1521,32 @@ def _deck_run(
             )
             # Parapet: a solid rail the player cannot wander off, and one they
             # can still jump. Falling into the harbour from 49 m is a feature.
-            for inner, outer in (
-                (t_edge - math.copysign(0.45, t_edge), t_edge),
-            ):
+            # Opened where a carriageway leaves the deck; a span with no gap in
+            # it is drawn from the segment's own ends, so a deck with no exit
+            # is the same bytes it always was.
+            inner, outer = t_edge - math.copysign(0.45, t_edge), t_edge
+            for pa, pc in _parapet_spans(a, c, math.copysign(1.0, t_edge), gaps):
+                ypa, ypc = (ya, yc) if (pa, pc) == (a, c) else (level(pa), level(pc))
                 b.face(
                     "landmark_steel",
-                    (at(a, inner, ya), at(c, inner, yc),
-                     at(c, inner, yc + BRIDGE_PARAPET_HEIGHT),
-                     at(a, inner, ya + BRIDGE_PARAPET_HEIGHT)),
+                    (at(pa, inner, ypa), at(pc, inner, ypc),
+                     at(pc, inner, ypc + BRIDGE_PARAPET_HEIGHT),
+                     at(pa, inner, ypa + BRIDGE_PARAPET_HEIGHT)),
                     -outward,
                 )
                 b.face(
                     "landmark_steel",
-                    (at(a, outer, ya), at(c, outer, yc),
-                     at(c, outer, yc + BRIDGE_PARAPET_HEIGHT),
-                     at(a, outer, ya + BRIDGE_PARAPET_HEIGHT)),
+                    (at(pa, outer, ypa), at(pc, outer, ypc),
+                     at(pc, outer, ypc + BRIDGE_PARAPET_HEIGHT),
+                     at(pa, outer, ypa + BRIDGE_PARAPET_HEIGHT)),
                     outward,
                 )
                 b.face(
                     "landmark_steel",
-                    (at(a, inner, ya + BRIDGE_PARAPET_HEIGHT),
-                     at(c, inner, yc + BRIDGE_PARAPET_HEIGHT),
-                     at(c, outer, yc + BRIDGE_PARAPET_HEIGHT),
-                     at(a, outer, ya + BRIDGE_PARAPET_HEIGHT)),
+                    (at(pa, inner, ypa + BRIDGE_PARAPET_HEIGHT),
+                     at(pc, inner, ypc + BRIDGE_PARAPET_HEIGHT),
+                     at(pc, outer, ypc + BRIDGE_PARAPET_HEIGHT),
+                     at(pa, outer, ypa + BRIDGE_PARAPET_HEIGHT)),
                     (0.0, 1.0, 0.0),
                 )
 
@@ -1512,14 +1556,17 @@ def _deck_run(
         deck_ring = _rect_enu(enu, mid, 0.0, c - a, BRIDGE_DECK_WIDTH)
         prisms.append(Prism(deck_ring, soffit_mid, y_mid - soffit_mid, "deck"))
         for t_edge in (-half_w + 0.22, half_w - 0.22):
-            prisms.append(
-                Prism(
-                    _rect_enu(enu, mid, t_edge, c - a, 0.5),
-                    y_mid,
-                    BRIDGE_PARAPET_HEIGHT,
-                    "parapet",
+            for pa, pc in _parapet_spans(a, c, math.copysign(1.0, t_edge), gaps):
+                whole = (pa, pc) == (a, c)
+                pm = mid if whole else (pa + pc) * 0.5
+                prisms.append(
+                    Prism(
+                        _rect_enu(enu, pm, t_edge, pc - pa, 0.5),
+                        y_mid if whole else level(pm),
+                        BRIDGE_PARAPET_HEIGHT,
+                        "parapet",
+                    )
                 )
-            )
 
     # Approach piers, on the stretches where the deck is genuinely in the air
     # over land. Skipped over the harbour, where the arch is carrying it, and
@@ -1538,6 +1585,94 @@ def _deck_run(
                     s_ff,
                 )
         pier += 56.0
+
+
+# The shortest piece of parapet worth keeping either side of a gap, metres. A
+# sliver under this is a post nobody can see standing in the mouth of an exit.
+PARAPET_MIN_PIECE_M = 0.5
+
+
+def _parapet_spans(a: float, c: float, side: float, gaps) -> list[tuple[float, float]]:
+    """The parts of the stretch `[a, c]` of one edge that keep their parapet."""
+    spans = [(a, c)]
+    for g_side, g0, g1 in gaps:
+        if g_side != side:
+            continue
+        kept: list[tuple[float, float]] = []
+        for x0, x1 in spans:
+            if g1 <= x0 or g0 >= x1:
+                kept.append((x0, x1))
+                continue
+            if g0 - x0 >= PARAPET_MIN_PIECE_M:
+                kept.append((x0, g0))
+            if x1 - g1 >= PARAPET_MIN_PIECE_M:
+                kept.append((g1, x1))
+        spans = kept
+    return spans
+
+
+def _gap_length(gaps, side: float, lo: float, hi: float) -> float:
+    """The union length of one edge's gaps inside `[lo, hi]`."""
+    spans = sorted(
+        (max(g0, lo), min(g1, hi)) for g_side, g0, g1 in gaps if g_side == side and min(g1, hi) > max(g0, lo)
+    )
+    total = 0.0
+    cur: list[float] | None = None
+    for x0, x1 in spans:
+        if cur is None or x0 > cur[1]:
+            if cur is not None:
+                total += cur[1] - cur[0]
+            cur = [x0, x1]
+        else:
+            cur[1] = max(cur[1], x1)
+    if cur is not None:
+        total += cur[1] - cur[0]
+    return total
+
+
+# How deep, along the deck, the barrier across a ramp's end is. **Deep because a
+# car is fast, not because a barrier is thick**: `driving.DRIVE_TOP_SPEED` is 44
+# m/s, 0.73 m a tick at 60 Hz, and the first barrier here was the edge rail's
+# 0.45 m -- `server/ramp-check.ts`'s NorthSpur drove through it in one tick and
+# off the end. Four ticks of travel, drawn as the granite block it is.
+BRIDGE_END_BARRIER_DEPTH = 3.0
+
+
+def _end_barrier(b: _Builder, at, enu, prisms: list[Prism], s_end: float, end: float, level, half_w: float) -> None:
+    """A granite block across the deck at a ramp's last station, drawn and solid.
+
+    The edge parapets' height, the full deck width, and `BRIDGE_END_BARRIER_DEPTH`
+    back from the end, standing on the ramp; every face drawn, so nothing about
+    it is an invisible wall. `landmark-audit` tells it from a rail by its width:
+    an edge rail is 0.5 m across the axis and this is the whole deck.
+    """
+    depth = BRIDGE_END_BARRIER_DEPTH
+    h = BRIDGE_PARAPET_HEIGHT
+    s_out, s_in = s_end, s_end - end * depth
+    y_in, y_out = level(s_in), level(s_out)
+    toward = at(s_end + end, 0.0, 0.0) - at(s_end, 0.0, 0.0)
+    sideways = at(s_end, 1.0, 0.0) - at(s_end, 0.0, 0.0)
+    for s_face, normal in ((s_in, -toward), (s_out, toward)):
+        y = level(s_face)
+        b.face(
+            "landmark_granite",
+            (at(s_face, -half_w, y), at(s_face, half_w, y), at(s_face, half_w, y + h), at(s_face, -half_w, y + h)),
+            normal,
+        )
+    for t_face, normal in ((-half_w, -sideways), (half_w, sideways)):
+        b.face(
+            "landmark_granite",
+            (at(s_in, t_face, y_in), at(s_out, t_face, y_out), at(s_out, t_face, y_out + h), at(s_in, t_face, y_in + h)),
+            normal,
+        )
+    b.face(
+        "landmark_granite",
+        (at(s_in, -half_w, y_in + h), at(s_in, half_w, y_in + h),
+         at(s_out, half_w, y_out + h), at(s_out, -half_w, y_out + h)),
+        (0.0, 1.0, 0.0),
+    )
+    mid = (s_in + s_out) * 0.5
+    prisms.append(Prism(_rect_enu(enu, mid, 0.0, depth, BRIDGE_DECK_WIDTH), max(y_in, y_out), h, "parapet"))
 
 
 def _rect_local(at, s: float, t: float, along: float, across: float) -> list[tuple[float, float]]:
@@ -3161,19 +3296,24 @@ def build_luna_park(anchors: dict[str, Anchor], terrain) -> Landmark:
 # --- The build -----------------------------------------------------------------
 
 
-def build_all(terrain, anchors: dict[str, Anchor] | None = None) -> list[Landmark]:
+def build_all(terrain, anchors: dict[str, Anchor] | None = None, exits=()) -> list[Landmark]:
     """All four, in one pass, sharing one OSM read.
 
     Both reads are memoised on the caller's behalf rather than repeated: an OSM
     `multipolygons` pass over the inner ring is 40,290 features and five seconds,
     and `cli.cmd_build` has already done both by the time it gets here.
+
+    `exits` is `decks.hero_deck_exits` -- where a carriageway leaves the bridge's
+    deck -- and it is handed in as data rather than computed here, so this module
+    reads no roads. Empty (every audit harness that only wants the audit numbers)
+    builds the bridge with its parapets unbroken, which is what it always did.
     """
     if anchors is None:
         anchors = read_anchors()
     if _WESTFIELD_RING is None:
         read_podium_ring()
     return [
-        build_bridge(anchors, terrain),
+        build_bridge(anchors, terrain, exits),
         build_opera(anchors, terrain),
         build_tower(anchors, terrain),
         build_luna_park(anchors, terrain),

@@ -335,6 +335,50 @@ than around it.
 
 Both are asserted arithmetically in `verify_decks`, which `cmd_build` runs before
 it reads a byte.
+
+---------------------------------------------------------------------------
+**THE SIXTH BUG: A DECK THAT JOINS THE HARBOUR BRIDGE, SOLVED AS IF IT DID NOT.**
+
+The owner, in a car at the north end of the hero deck, over Fitzroy Street:
+*"this is the north end of the bridge, it needs to connect to the road"*. It did
+not, and the measurement off build 1789283139 says why in three numbers.
+
+The pylon frame `landmarks.build_bridge` builds on runs 4.3 degrees east of the
+carriageways OSM maps, so the Bradfield Highway and the Cahill Expressway cross
+the hero deck's **western edge** at s 420, 447 and 466 and curve away north-west
+to Milsons Point, while the hero deck runs straight on for another 234 m into
+Kirribilli and stops 10.70 m in the air. The hero clip above cut each of those
+three ways where it left the zone -- the deck grown `SUPPRESS_MARGIN_M` either
+side -- and **the cut end was a free node**: no ground way shares it, so
+`_harmonic` hung it flat off its neighbours and the floor held it at its own
+ground's height. The generic deck therefore began **15.3 to 16.3 m below** the
+hero deck it leaves, with eight metres of air between them and the hero's 1.25 m
+parapet across the gap. Traffic was scripted through all three; a player's car
+hit the parapet, and the only way on was straight ahead, off the end.
+
+The touchdowns were never the problem, and that is worth stating because it is
+the obvious suspect after a round that lowered the ground: all three Milsons
+Point touchdowns meet their street's lane at **0.000 m**, because a pin *is*
+`terrain.sample + CARRIAGEWAY_Y`, the height the street asphalt is draped at.
+(`roadgrade.RoadSurface` differs from that by up to 1.5 m there -- it is what the
+solve wanted, not what the 31.25 m lattice could hold, and pinning to it would
+put a 1.5 m lip at every touchdown.)
+
+So the rule, stated once, in the shape of the touchdown rule it extends:
+
+  **A deck that leaves the hero deck across an edge is pinned to the hero deck's
+  running surface wherever its ribbon still overlaps the hero deck's plan, and
+  its run starts where the ribbon is wholly on the deck.** Past that it is
+  solved exactly as before, down to touchdowns that have not moved.
+
+`hero_deck_exits` finds the crossings, from OSM and the pylon frame alone, so
+`landmarks.build_bridge` can open its parapet over exactly the stretch of edge
+each ribbon crosses and this module can extend the cut run back onto the deck.
+`DeckNetwork.load` takes the hero as an object -- `lanes.HeroDeck`, which already
+rebuilds the profile from the landmark's constants -- rather than a fourth copy of
+it. Pinned `HERO_JOIN_DROP_M` under the hero asphalt, the way a street is lifted
+`CARRIAGEWAY_Y` over its ground, so the two surfaces where they overlap are one
+step of two centimetres and not a z-fight. `_verify_hero_join` asserts it.
 """
 
 from __future__ import annotations
@@ -647,6 +691,27 @@ SUPPRESS_MARGIN_M = 8.0
 # of viaduct is two triangles and a collision prism describing nothing.
 MIN_RUN_M = 8.0
 
+# --- Joining the hero deck -------------------------------------------------------
+#
+# See the header's sixth bug. How far onto the hero deck a joining run starts,
+# measured from the edge to the ribbon's outer side: enough that the two decks
+# overlap in plan and a wheel crossing the seam is always over asphalt.
+HERO_JOIN_OVERLAP_M = 1.0
+# How far under the hero's asphalt a pinned join sits. `streets.CARRIAGEWAY_Y`'s
+# two centimetres, for its reason: two coplanar surfaces z-fight, and a 2 cm step
+# is under anything a wheel or a foot can register (`MAX_STEP_M` is 0.35).
+HERO_JOIN_DROP_M = 0.02
+# How far back along a way, from where it crosses the edge, the walk onto the
+# deck may look for the point its ribbon is wholly on it. A 20-degree exit with a
+# 7.6 m ribbon needs about 45 m; a way that has not got onto the deck by this
+# distance is running along the edge, not leaving across it.
+HERO_JOIN_REACH_M = 150.0
+# How near another deck's running surface a parapet may stand, vertically, and
+# still be standing *on* that deck. Under it the barrier is between two
+# carriageways that share one surface, and it is not built. See
+# `_shared_parapets`.
+PARAPET_SHARED_DY_M = 1.0
+
 SLOT_DECK = "road_asphalt"
 SLOT_STRUCTURE = "footpath_concrete"
 
@@ -736,6 +801,21 @@ class DeckRun:
     _left: np.ndarray | None = field(default=None, repr=False, compare=False)
     _para: np.ndarray | None = field(default=None, repr=False, compare=False)
     _tops: np.ndarray | None = field(default=None, repr=False, compare=False)
+    # (2, N) per-edge multipliers on `parapet`, row 0 the `+left` edge. None is
+    # all ones. Set by `_shared_parapets`; read through `parapet_on`.
+    _para_mask: np.ndarray | None = field(default=None, repr=False, compare=False)
+
+    def parapet_on(self, side: float) -> np.ndarray:
+        """`parapet` on one edge, zero where that edge stands on another deck.
+
+        `side` is the sign `prisms` and `_emit_run` give `left`. Both read the
+        barrier through this and nothing else, for `parapet`'s own reason: two
+        answers to how tall a barrier is is how a wall ends up where nothing is
+        drawn.
+        """
+        if self._para_mask is None:
+            return self.parapet
+        return self.parapet * self._para_mask[0 if side > 0 else 1]
 
     @property
     def frames(self) -> np.ndarray:
@@ -910,6 +990,8 @@ class DeckNetwork:
         terrain,
         suppress: Polygon | None = None,
         roads: list[osm.OsmRoad] | None = None,
+        hero=None,
+        exits=(),
     ) -> DeckNetwork:
         """Solve every bridge way in the extent against the conformed ground.
 
@@ -917,6 +999,12 @@ class DeckNetwork:
         returns and every other module reads -- because the touchdown heights are
         read straight off it and a deck solved against the raw DEM would land a
         couple of metres away from the asphalt it is supposed to meet.
+
+        `hero` is `lanes.HeroDeck` and `exits` is `hero_deck_exits`; with both,
+        a run the hero clip cut beside an exit is extended back onto the hero
+        deck and pinned to it. See the header's sixth bug. Without `hero` the
+        exits are ignored, because an extension with nothing to pin it would be
+        a free end hanging over the hero's deck.
         """
         if roads is None:
             roads = osm.read_roads(radius_m)
@@ -930,6 +1018,12 @@ class DeckNetwork:
 
         clipped: list[tuple[osm.OsmRoad, np.ndarray]] = []
         suppressed_m = 0.0
+        exits_by_way: dict[str, list[HeroExit]] = {}
+        if hero is not None:
+            for ex in exits or ():
+                exits_by_way.setdefault(ex.osm_id, []).append(ex)
+        # The indices into `clipped` of the runs extended onto the hero deck.
+        joins: set[int] = set()
         for r in bridges:
             line = LineString(r.line)
             if suppress is not None and suppress.intersects(line):
@@ -939,8 +1033,11 @@ class DeckNetwork:
             else:
                 outside = line
             for piece in _linestrings(outside):
-                pts = np.asarray(piece.coords, dtype=np.float64)
-                if len(pts) >= 2 and piece.length >= MIN_RUN_M:
+                pts, joined = _join_hero(line, piece, exits_by_way.get(r.osm_id, ()))
+                length = float(np.hypot(*np.diff(pts, axis=0).T).sum()) if len(pts) >= 2 else 0.0
+                if len(pts) >= 2 and length >= MIN_RUN_M:
+                    if joined:
+                        joins.add(len(clipped))
                     clipped.append((r, pts))
 
         # The extents inside which the ground is a station's rather than the
@@ -958,6 +1055,8 @@ class DeckNetwork:
             terrain,
             [r for r in roads if _is_ground_carriageway(r) and r.highway not in PRIVATE_CLASSES],
             zones,
+            hero=hero,
+            joins=joins,
         )
         # After the solve and before anything reads a station, because everything
         # that reads one -- the ribbon, the prisms, the piers, the tile index --
@@ -982,7 +1081,10 @@ class DeckNetwork:
             if (step > MAX_STEP_M).any():
                 runs[i] = _restation_steep(run, terrain)
                 restationed += 1
+        # After the restation, because the mask is per station of the final one.
+        shared_edges = _shared_parapets(runs, hero)
         stats = {
+            "shared_parapet_stations": shared_edges,
             "restationed_runs": restationed,
             "cliff_segments": cliffs,
             "bridge_ways": len(bridges),
@@ -1116,20 +1218,23 @@ class DeckNetwork:
                 # inside the wedge rather than around it. Under `MAX_STEP_M` it
                 # is a thing a body steps over anyway and a prism for it is bytes
                 # that can only ever be wrong. See `DeckRun.parapet`.
-                wall = min(float(para[i]), float(para[i + 1]))
-                if wall >= MAX_STEP_M:
-                    for side in (1.0, -1.0):
-                        off = side * (hw - PARAPET_THICK_M * 0.5)
-                        out.append(
-                            Prism(
-                                _mitred_ring(
-                                    run.pts, left, i, PARAPET_THICK_M * 0.5, offset=off
-                                ),
-                                float(top),
-                                wall,
-                                "parapet",
-                            )
+                # Per edge, since an edge standing on another deck has none.
+                for side in (1.0, -1.0):
+                    edge = para if run._para_mask is None else run.parapet_on(side)
+                    wall = min(float(edge[i]), float(edge[i + 1]))
+                    if wall < MAX_STEP_M:
+                        continue
+                    off = side * (hw - PARAPET_THICK_M * 0.5)
+                    out.append(
+                        Prism(
+                            _mitred_ring(
+                                run.pts, left, i, PARAPET_THICK_M * 0.5, offset=off
+                            ),
+                            float(top),
+                            wall,
+                            "parapet",
                         )
+                    )
         return out
 
     # --- Emission -------------------------------------------------------------
@@ -1231,11 +1336,253 @@ def hero_bridge_zone(anchors: dict, zones: dict) -> Polygon:
     return merged if merged.geom_type == "Polygon" else merged.convex_hull
 
 
+@dataclass
+class HeroExit:
+    """One carriageway leaving the hero deck across one of its long edges."""
+
+    osm_id: str
+    # Which edge, as the sign of `across` in `landmarks._bridge_frame`: the
+    # sign `landmarks._deck_run` gives `t_edge`, so the two cannot disagree.
+    side: float
+    s_cross: float  # where the centreline crosses the edge, along the axis
+    # The stretch of the edge line the way's ribbon covers, along the axis. The
+    # parapet is opened over exactly this and no more.
+    gap: tuple[float, float]
+    d_join: float  # arclength along the way where the ribbon is wholly on the deck
+    d_cross: float  # arclength along the way where the centreline crosses the edge
+    outward: bool  # the digitised direction runs from the deck to the edge
+
+
+def hero_deck_exits(anchors: dict, roads: list[osm.OsmRoad]) -> list[HeroExit]:
+    """Where carriageways leave the Harbour Bridge's level deck sideways.
+
+    See the header's sixth bug. From the pylon frame and OSM alone -- no terrain,
+    no solve -- because two passes need the answer before either has run:
+    `landmarks.build_bridge` to open its parapet, and `DeckNetwork.load` to
+    extend the cut run back onto the deck. Only the level deck's edges are asked
+    about; the ramps' length is decided by the terrain inside `build_bridge`, and
+    no way leaves a ramp sideways anywhere in the extent.
+
+    Public carriageways only, on the crossing rule's grounds: a service way on a
+    bridge is a maintenance track, and the parapet is not opened for it.
+    """
+    from shapely import get_coordinates
+    from shapely.ops import substring
+
+    from . import landmarks as lm
+
+    centre, along, across = lm._bridge_frame(anchors)
+    half_len = lm.BRIDGE_TOTAL_LENGTH * 0.5
+    half_w = lm.BRIDGE_DECK_WIDTH * 0.5
+    out: list[HeroExit] = []
+    for r in roads:
+        if not _is_deck(r) or r.highway in PRIVATE_CLASSES or len(r.line) < 2:
+            continue
+        rel = r.line - centre
+        s = rel @ along
+        t = rel @ across
+        if not ((np.abs(s) <= half_len) & (np.abs(t) <= half_w)).any():
+            continue
+        hw = _half_width(r)
+        line = LineString(r.line)
+        seg_len = np.hypot(*np.diff(r.line, axis=0).T)
+        chain = np.concatenate(([0.0], np.cumsum(seg_len)))
+        for k in range(len(r.line) - 1):
+            if seg_len[k] < 1e-6:
+                continue
+            for side in (-1.0, 1.0):
+                a = side * t[k] - half_w
+                b = side * t[k + 1] - half_w
+                if a * b >= 0.0:
+                    continue
+                f = a / (a - b)
+                s_cross = float(s[k] + f * (s[k + 1] - s[k]))
+                if abs(s_cross) > half_len:
+                    continue
+                # The ribbon's reach across the axis: its half width projected
+                # onto `across` is `hw` times the way's alignment with `along`.
+                c = abs(float((r.line[k + 1] - r.line[k]) @ along)) / float(seg_len[k])
+                d_cross = float(chain[k] + f * seg_len[k])
+                outward = a < 0.0
+                want = half_w - hw * c - HERO_JOIN_OVERLAP_M
+                step = -0.5 if outward else 0.5
+                d = d_cross
+                d_join = None
+                while abs(d - d_cross) <= HERO_JOIN_REACH_M and 0.0 <= d <= line.length:
+                    p = line.interpolate(d)
+                    if side * float((np.array([p.x, p.y]) - centre) @ across) <= want:
+                        d_join = d
+                        break
+                    d += step
+                if d_join is None:
+                    continue
+                lo, hi = sorted((d_join, 2.0 * d_cross - d_join))
+                ribbon = substring(line, max(lo, 0.0), min(hi, line.length)).buffer(hw, cap_style=2)
+                edge = LineString(
+                    [centre - along * half_len + across * side * half_w,
+                     centre + along * half_len + across * side * half_w]
+                )
+                xy = get_coordinates(ribbon.intersection(edge))
+                if len(xy) == 0:
+                    continue
+                on_edge = (xy - centre) @ along
+                out.append(
+                    HeroExit(
+                        osm_id=r.osm_id,
+                        side=side,
+                        s_cross=s_cross,
+                        gap=(float(on_edge.min()) - 0.25, float(on_edge.max()) + 0.25),
+                        d_join=float(d_join),
+                        d_cross=d_cross,
+                        outward=outward,
+                    )
+                )
+    out.sort(key=lambda e: (e.side, e.s_cross, e.osm_id))
+    return out
+
+
+def _join_hero(line: LineString, piece: LineString, exits) -> tuple[np.ndarray, bool]:
+    """A piece left by the hero clip, extended back onto the deck it leaves.
+
+    Returns the piece's points and whether it was extended. Only a piece whose
+    cut end is the one next to an exit is: the stretch between the edge crossing
+    and the zone boundary is the margin, eight metres of it across the axis, and
+    `HERO_JOIN_REACH_M` bounds it along the way.
+    """
+    from shapely.geometry import Point
+    from shapely.ops import substring
+
+    pts = np.asarray(piece.coords, dtype=np.float64)
+    if not exits:
+        return pts, False
+    d0 = line.project(Point(*pts[0]))
+    d1 = line.project(Point(*pts[-1]))
+    lo, hi = min(d0, d1), max(d0, d1)
+    joined = False
+    for ex in exits:
+        if ex.outward and ex.d_join < ex.d_cross <= lo + 1e-6 and lo - ex.d_cross <= HERO_JOIN_REACH_M:
+            lo = min(lo, ex.d_join)
+            joined = True
+        elif (not ex.outward) and ex.d_join > ex.d_cross >= hi - 1e-6 and ex.d_cross - hi <= HERO_JOIN_REACH_M:
+            hi = max(hi, ex.d_join)
+            joined = True
+    if not joined:
+        return pts, False
+    return np.asarray(substring(line, lo, hi).coords, dtype=np.float64), True
+
+
+def _shared_parapets(runs: list, hero=None) -> int:
+    """Take the barrier off every edge that stands on another deck.
+
+    **A parapet is a barrier between a deck and the air, so an edge with a deck
+    under it has none.** OSM draws a divided carriageway as two centrelines, and
+    at Milsons Point the Bradfield Highway's are eight metres apart with ribbons
+    7.6 m either side of each -- so the southbound carriageway's western parapet
+    runs down the middle of the northbound lane. While that approach lay on its
+    ground, under `PARAPET_MIN_CLEARANCE_M`, no parapet was built and nobody saw
+    it (`server/ramp-check.ts` routes 4.5 m off the centreline for the stretch
+    where one was). Joined to the hero deck it stands 7-9 m up, every station
+    earns a barrier, and a car driving the lane off the bridge met a 1.05 m wall
+    across its bonnet at E 251 N 2414 -- the sixth bug's fix, stopped by this.
+
+    So per station and per edge: the parapet's own centre line is tested against
+    every other run's ribbon (inside it by more than the barrier's thickness) and
+    the hero deck's plan, and where the surface there is within
+    `PARAPET_SHARED_DY_M` of this deck's, that edge's barrier is zero at that
+    station. Two things are deliberately not done. A deck *over* another by more
+    than that keeps its barrier -- a flyover's edge is an edge. And the test is
+    strictly inside, so two runs meeting end to end at a junction keep their
+    barriers along the edges they continue.
+
+    Returns how many edge stations lost a barrier. Sets `DeckRun._para_mask` only
+    on runs where one did, so everywhere else is exactly the arrays it was.
+    """
+    from collections import defaultdict
+
+    cell = CROSS_CELL_M
+    bins: dict[tuple[int, int], list[tuple[int, int]]] = defaultdict(list)
+    for r_i, run in enumerate(runs):
+        p = run.pts
+        hw = run.half_width
+        for k in range(len(p) - 1):
+            x0, y0 = p[k]
+            x1, y1 = p[k + 1]
+            for c in _cells(min(x0, x1) - hw, min(y0, y1) - hw, max(x0, x1) + hw, max(y0, y1) + hw, cell):
+                bins[c].append((r_i, k))
+
+    removed = 0
+    for r_i, run in enumerate(runs):
+        n = len(run.pts)
+        if n < 2:
+            continue
+        para = run.parapet
+        live = np.flatnonzero(para > 0.0)
+        if live.size == 0:
+            continue
+        mask = np.ones((2, n))
+        left = run.frames
+        for si, side in enumerate((1.0, -1.0)):
+            q = run.pts + left * (side * (run.half_width - PARAPET_THICK_M * 0.5))
+            on_hero = np.zeros(n, dtype=bool)
+            if hero is not None:
+                hs, ht = hero.frame(q)
+                on_hero = (
+                    (np.abs(ht) <= hero.half_width - PARAPET_THICK_M)
+                    & (np.abs(hs) <= hero.half_length)
+                    & (np.abs(hero.surface(hs) - run.deck_y) <= PARAPET_SHARED_DY_M)
+                )
+            for k in live:
+                if on_hero[k]:
+                    mask[si, k] = 0.0
+                    continue
+                x, y = float(q[k, 0]), float(q[k, 1])
+                for c in _cells(x, y, x, y, cell):
+                    hit = False
+                    for o_i, ok in bins.get(c, ()):
+                        if o_i == r_i:
+                            continue
+                        o = runs[o_i]
+                        a, b = o.pts[ok], o.pts[ok + 1]
+                        ab = b - a
+                        den = float(ab @ ab)
+                        t = 0.0 if den <= 0.0 else min(1.0, max(0.0, float((q[k] - a) @ ab) / den))
+                        foot = a + t * ab
+                        if math.hypot(x - foot[0], y - foot[1]) >= o.half_width - PARAPET_THICK_M:
+                            continue
+                        oy = float(o.deck_y[ok] + t * (o.deck_y[ok + 1] - o.deck_y[ok]))
+                        if abs(oy - float(run.deck_y[k])) <= PARAPET_SHARED_DY_M:
+                            hit = True
+                            break
+                    if hit:
+                        mask[si, k] = 0.0
+                        break
+        if (mask < 1.0).any():
+            removed += int((mask[:, live] < 1.0).sum())
+            object.__setattr__(run, "_para_mask", mask)
+    return removed
+
+
+def _hero_join_heights(sp: np.ndarray, hw: float, hero) -> np.ndarray:
+    """The hero's running surface at each station whose ribbon overlaps its deck.
+
+    NaN elsewhere. The overlap is the ribbon's *inner* side -- the centreline's
+    distance off the axis less the ribbon's half width projected across it --
+    against the deck's half width, over the level deck only, which is where
+    `hero_deck_exits` looks.
+    """
+    s, t = hero.frame(sp)
+    d = np.gradient(np.asarray(sp, dtype=np.float64), axis=0)
+    norm = np.hypot(d[:, 0], d[:, 1])
+    c = np.abs(d @ hero.along) / np.where(norm > 1e-9, norm, 1.0)
+    on = (np.abs(t) - hw * c <= hero.half_width) & (np.abs(s) <= hero.half_length)
+    return np.where(on, hero.surface(s) - HERO_JOIN_DROP_M, np.nan)
+
+
 # --- The solve -----------------------------------------------------------------
 
 
 def _solve(
-    clipped, ground_nodes: set, terrain, ground_roads, zones=()
+    clipped, ground_nodes: set, terrain, ground_roads, zones=(), hero=None, joins=frozenset()
 ) -> tuple[list[DeckRun], dict, list[dict]]:
     """Station every run, wire them into one graph, and solve the profile.
 
@@ -1304,6 +1651,26 @@ def _solve(
         if key in ground_nodes:
             pinned[nid] = True
     h = ground + streets.CARRIAGEWAY_Y
+
+    # The joins onto the hero deck: pins, exactly as a touchdown is, and before
+    # the component census so a run whose only other contact is the hero deck is
+    # not taken for a dangling one. See the header's sixth bug.
+    join_stats = {"hero_join_runs": 0, "hero_join_nodes": 0}
+    if hero is not None and joins:
+        want = np.full(n_nodes, -np.inf)
+        for idx in sorted(joins):
+            sp, ids = stations[idx], node_of[idx]
+            if len(sp) < 2:
+                continue
+            hh = _hero_join_heights(sp, _half_width(clipped[idx][0]), hero)
+            on = np.isfinite(hh)
+            if on.any():
+                join_stats["hero_join_runs"] += 1
+                np.maximum.at(want, ids[on], hh[on])
+        hit = np.isfinite(want)
+        pinned |= hit
+        h[hit] = want[hit]
+        join_stats["hero_join_nodes"] = int(hit.sum())
 
     comps, n_comp, unpinned = _components(edge, n_nodes, pinned)
     # A component that reaches no ground way at all -- a ramp whose only other
@@ -1430,6 +1797,7 @@ def _solve(
             "components": int(n_comp),
             "unpinned_components": len(unpinned),
             **zone_stats,
+            **join_stats,
             **cross_stats,
         },
         crossings,
@@ -2246,6 +2614,9 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
         # no end caps, because consecutive segments abut and a barrier run's
         # two ends have grown down to nothing.
         for side in (1.0, -1.0):
+            ps = para if run._para_mask is None else run.parapet_on(side)
+            if ps[i] <= 0.01 and ps[j] <= 0.01:
+                continue
             out = left[i] * side
             outer = side * hw
             inner = side * (hw - PARAPET_THICK_M)
@@ -2253,16 +2624,16 @@ def _emit_run(slots, run: DeckRun, lo: int, hi: int, origin) -> None:
                 _quad(
                     struct,
                     edge_pt(i, off / hw, dy[i]), edge_pt(j, off / hw, dy[j]),
-                    edge_pt(j, off / hw, dy[j] + para[j]),
-                    edge_pt(i, off / hw, dy[i] + para[i]),
+                    edge_pt(j, off / hw, dy[j] + ps[j]),
+                    edge_pt(i, off / hw, dy[i] + ps[i]),
                     (nrm[0], 0.0, -nrm[1]), origin,
                 )
             _quad(
                 struct,
-                edge_pt(i, inner / hw, dy[i] + para[i]),
-                edge_pt(j, inner / hw, dy[j] + para[j]),
-                edge_pt(j, outer / hw, dy[j] + para[j]),
-                edge_pt(i, outer / hw, dy[i] + para[i]),
+                edge_pt(i, inner / hw, dy[i] + ps[i]),
+                edge_pt(j, inner / hw, dy[j] + ps[j]),
+                edge_pt(j, outer / hw, dy[j] + ps[j]),
+                edge_pt(i, outer / hw, dy[i] + ps[i]),
                 (0.0, 1.0, 0.0), origin,
             )
 
@@ -2431,6 +2802,45 @@ def verify_decks() -> list[str]:
     failures += _verify_station_zone_ground()
     failures += _verify_touchdown_taper()
     failures += _verify_parapet_ramp()
+    failures += _verify_hero_join()
+    failures += _verify_shared_parapets()
+    return failures
+
+
+def _verify_shared_parapets() -> list[str]:
+    """Two carriageways sharing a surface lose the barrier between them, and only it.
+
+    Three parallel runs 60 m long, 10 m over flat ground: A, and B eight metres to
+    one side at the same height -- the Milsons Point spacing, with ribbons 7.6 m
+    wide that overlap -- and C eight metres to the other side and 5 m higher.
+    A's edge toward B stands on B and must lose its barrier; A's edge toward C
+    stands over air under a flyover and keeps it; C keeps both.
+    """
+    failures: list[str] = []
+    n = 11
+    xs = np.linspace(0.0, 60.0, n)
+
+    def run(y_off: float, height: float) -> DeckRun:
+        return DeckRun(
+            road=None,
+            pts=np.column_stack((xs, np.full(n, y_off))),
+            deck_y=np.full(n, height),
+            ground=np.zeros(n),
+            half_width=7.6,
+        )
+
+    a, b, c = run(0.0, 10.0), run(8.0, 10.0), run(-8.0, 15.0)
+    removed = _shared_parapets([a, b, c])
+    if removed == 0 or a._para_mask is None:
+        return ["two carriageways sharing a surface both kept the barrier between them"]
+    # `left` of a run along +x is +y, so `side = +1` is the edge toward B.
+    mid = n // 2
+    if a.parapet_on(1.0)[mid] > 0.0:
+        failures.append("the barrier between two carriageways on one surface is still built")
+    if a.parapet_on(-1.0)[mid] <= 0.0:
+        failures.append("a deck lost the barrier on an edge that stands under a flyover, not on it")
+    if c._para_mask is not None and (c.parapet_on(1.0)[mid] <= 0.0 or c.parapet_on(-1.0)[mid] <= 0.0):
+        failures.append("a flyover 5 m over another deck lost its edge barrier")
     return failures
 
 
@@ -2595,4 +3005,85 @@ def _verify_station_zone_ground() -> list[str]:
     same = _station_zone_ground([sp], [ids], dip, 7, ())[0]
     if same is not dip:
         failures.append("the station-zone rule rebuilt the ground with no zones to read")
+    return failures
+
+
+def _verify_hero_join() -> list[str]:
+    """The join rule's claims, on a made-up bridge. See the header's sixth bug.
+
+    A deck 20 m wide and 30 m up along the x axis, and a 636 m carriageway that
+    leaves it across an edge at about 19 degrees and touches down on flat ground
+    at its far end. Four claims: the extension reaches back onto the deck; every
+    station whose ribbon still overlaps the deck is pinned to it; the touchdown
+    is untouched and the grade between is inside the ceiling; and with the rule
+    out the same run does *not* come up to the deck -- which is what makes the
+    first three about the rule rather than about a solve that got there anyway.
+    """
+    from types import SimpleNamespace
+
+    from shapely.ops import substring
+
+    failures: list[str] = []
+
+    class _Hero:
+        along = np.array([1.0, 0.0])
+        half_width = 10.0
+        half_length = 200.0
+
+        @staticmethod
+        def frame(pts):
+            p = np.asarray(pts, dtype=np.float64).reshape(-1, 2)
+            return p[:, 0], -p[:, 1]
+
+        @staticmethod
+        def surface(s):
+            return np.full(np.shape(s), 30.0)
+
+    class _Flat:
+        @staticmethod
+        def sample(e, north):
+            return np.zeros(np.shape(e))
+
+    hero = _Hero()
+    way = np.array([[0.0, 0.0], [600.0, -210.0]])
+    road = SimpleNamespace(
+        osm_id="1", line=way, width=14.0, highway="motorway", layer=1,
+        bridge=True, tunnel=False, is_foot=False, name=None,
+    )
+    line = LineString(way)
+    hw = _half_width(road)
+
+    # The extension. The zone's boundary is 8 m past the edge; the exit says the
+    # ribbon is wholly on the deck at the way's start.
+    d_cross = 10.0 / (210.0 / line.length)
+    piece = substring(line, d_cross * 1.8, line.length)
+    ex = HeroExit("1", 1.0, 0.0, (0.0, 0.0), 0.0, d_cross, True)
+    pts, joined = _join_hero(line, piece, [ex])
+    if not joined or float(np.hypot(*pts[0])) > 1e-6:
+        failures.append(f"the hero join did not extend a cut run back onto the deck: starts at {pts[0].tolist()}")
+
+    ground_nodes = {_key(way[-1])}
+    runs, stats, _ = _solve([(road, way)], ground_nodes, _Flat, [], (), hero=hero, joins={0})
+    run = runs[0]
+    s, t = hero.frame(run.pts)
+    c = 600.0 / line.length
+    on = np.abs(t) - hw * c <= hero.half_width
+    if not on.any() or stats["hero_join_nodes"] != int(on.sum()):
+        failures.append(
+            f"the hero join pinned {stats['hero_join_nodes']} nodes against {int(on.sum())} stations"
+            " whose ribbon overlaps the deck"
+        )
+    elif not np.allclose(run.deck_y[on], 30.0 - HERO_JOIN_DROP_M):
+        failures.append(f"a joining deck is not on the hero deck where they overlap: {run.deck_y[on].tolist()}")
+    if abs(run.deck_y[-1] - streets.CARRIAGEWAY_Y) > 1e-9:
+        failures.append(f"the hero join moved the touchdown to {run.deck_y[-1]:.3f}")
+    seg = np.hypot(*np.diff(run.pts, axis=0).T)
+    grade = np.abs(np.diff(run.deck_y)) / np.maximum(seg, 1e-9)
+    free_seg = ~(on[:-1] & on[1:])
+    if free_seg.any() and grade[free_seg].max() > MAX_GRADE + 1e-6:
+        failures.append(f"the joining deck comes down at {grade[free_seg].max():.1%}, over {MAX_GRADE:.0%}")
+
+    off, _, _ = _solve([(road, way)], ground_nodes, _Flat, [], (), hero=hero, joins=set())
+    if float(off[0].deck_y[0]) > 29.0:
+        failures.append("the run reached the hero deck with the join rule out; the check proves nothing")
     return failures

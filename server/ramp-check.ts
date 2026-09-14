@@ -9,6 +9,7 @@
  *     bun run server/ramp-check.ts --walk-only        # skip the census
  *     bun run server/ramp-check.ts --no-relief        # the oracle: the rule out
  *     bun run server/ramp-check.ts --trace            # print the walks
+ *     bun run server/ramp-check.ts --north-only       # only 2b: off the bridge northward
  *
  * ---------------------------------------------------------------------------
  * WHY THIS EXISTS.
@@ -77,6 +78,35 @@
  *      meets a step with the full crash penalty rather than a stop. Cheap: one
  *      `sim.cars.take` and a few hundred ticks, on a fresh simulation per route
  *      so that two drives meet the same city.
+ *
+ *   2b. **Off the bridge, northward.** The owner, on the world published
+ *      2026-09-14 (build 1789283139), in a car on a broad flat deck labelled
+ *      "Fitzroy Street, Kirribilli", facing north at a drop onto the roofs:
+ *      *"this is the north end of the bridge, it needs to connect to the road"*.
+ *      Sections 1b and 2 climb *onto* the approach and stop before the hero
+ *      deck; nothing drove the other way, and the other way is where the three
+ *      faults are, measured from the shipped bytes:
+ *
+ *        - the hero deck runs straight on along the pylon axis for 234 m past
+ *          the point the Bradfield Highway and the Cahill Expressway leave it,
+ *          and ends at s 654.5, E 388.7 N 2419.0, **10.70 m** over Fitzroy
+ *          Street with nothing across it;
+ *        - the carriageways cross its western parapet at s 420-466 -- a
+ *          1.25 m wall the cars were scripted through and a player's car is
+ *          not;
+ *        - and the generic decks they cross onto start **15.3-16.3 m below**
+ *          the hero deck, because the hero clip left their cut ends free and
+ *          the solve put them at their own ground's height.
+ *
+ *      So two drives, both through the real `Simulation`. `BradfieldNorth` is
+ *      the road: from the deck at s 355, along the northbound carriageway's own
+ *      OSM vertices, down the approach and onto the Warringah Freeway at grade
+ *      at Milsons Point. It must **arrive**, it must not **fall** (descent no
+ *      road grade explains, summed over 5 m windows), and it must finish **on
+ *      the street** -- the car's height within half a metre of the ground under
+ *      it. `NorthSpur` is the owner's own line: straight on along the pylon
+ *      axis. It is not asked to arrive anywhere; it is asked not to leave the
+ *      deck through the air.
  *
  *   3. **The count.** Every `collision/<tile>.bin` in the build, read off the
  *      disk against every `tiles/<tile>.terr.bin`, every structural prism's
@@ -156,6 +186,7 @@ const WORST = Number(flag('worst', '20'));
 const SCAN_ONLY = has('scan-only');
 const WALK_ONLY = has('walk-only');
 const TRACE = has('trace');
+const NORTH_ONLY = has('north-only');
 /**
  * Walk the world with the low-deck rule taken out from under it.
  *
@@ -280,6 +311,75 @@ const ROUTES: Route[] = [
       [-277.6, 1093.7],
       [-276.4, 1096.3],
       [-275.2, 1099.0],
+    ],
+  },
+];
+
+/** A drive off the bridge. See section 2b in the header. */
+interface DriveOff {
+  name: string;
+  why: string;
+  /**
+   * `street`: must arrive, must not fall, must finish on the ground.
+   * `held`: need not arrive; must not fall -- the deck holds the car or stops it.
+   */
+  expect: 'street' | 'held';
+  /** `[east, north]` pairs. The first is where the car is put down. */
+  points: Array<[number, number]>;
+}
+
+const DRIVES_OFF: DriveOff[] = [
+  {
+    name: 'BradfieldNorth',
+    why: 'north off the hero deck, down the Bradfield Highway approach, onto the Warringah Freeway at grade at Milsons Point',
+    expect: 'street',
+    // **The carriageway's own OSM vertices and nothing invented.** Way
+    // 171978153 (the northbound Bradfield Highway over the bridge) from s 355 on
+    // the hero deck, then 1530530701, 1530530700, 1530531824 and 1530531818 --
+    // the chain `decks.py` solves as one approach -- to its touchdown on ground
+    // way 388949145 at E 196.6 N 2577.8, and 40 m up 385523794, the Warringah
+    // Freeway, so the last waypoint is a street and not a seam. Plan alignment
+    // survives a retile; this route means the same thing on any build.
+    points: [
+      [245.8, 2155.6],
+      [253.8, 2183.1],
+      [260.4, 2211.7],
+      [264.4, 2234.6],
+      [266.5, 2259.3],
+      [268.0, 2283.5],
+      [267.3, 2305.7],
+      [266.2, 2326.2],
+      [264.3, 2344.7],
+      [262.0, 2360.8],
+      [258.3, 2382.0],
+      [252.9, 2405.2],
+      [247.2, 2426.4],
+      [235.0, 2467.1],
+      [229.9, 2481.8],
+      [219.7, 2511.2],
+      [196.6, 2577.8],
+      [190.3, 2591.0],
+      [179.5, 2629.7],
+    ],
+  },
+  {
+    name: 'NorthSpur',
+    why: "straight on along the pylon axis past the last exit -- the owner's line",
+    expect: 'held',
+    // s 440 to s 710 along the pylon frame, 12 m east of the axis: the half of
+    // the deck no carriageway leaves by, so nothing here is a way off. The deck
+    // ends at s 654.5. (centre E 95.388 N 1833.945, along (0.44815, 0.89396).)
+    points: [
+      [303.3, 2221.9],
+      [316.8, 2248.7],
+      [330.2, 2275.6],
+      [343.6, 2302.4],
+      [357.1, 2329.2],
+      [370.5, 2356.0],
+      [384.0, 2382.8],
+      [397.4, 2409.6],
+      [410.9, 2436.5],
+      [424.3, 2463.3],
     ],
   },
 ];
@@ -572,7 +672,7 @@ async function runWalks(): Promise<void> {
     // cap and may have given a hexagon back before this file asks about it;
     // `loadNow` does not trim. `actor-ground-check` pins the same way.
     const wanted = new Set<string>();
-    for (const route of ROUTES) {
+    for (const route of [...ROUTES, ...DRIVES_OFF]) {
       for (const [east, north] of route.points) {
         const z = zOf(north);
         for (const entry of segments.entries) {
@@ -910,10 +1010,12 @@ async function runWalks(): Promise<void> {
     return false;
   };
 
-  say('\n1a. how much of each approach a body can get onto at all, from open ground');
-  say("    (the same world twice: the low-deck rule's ground taken out, then put back)");
+  if (!NORTH_ONLY) {
+    say('\n1a. how much of each approach a body can get onto at all, from open ground');
+    say("    (the same world twice: the low-deck rule's ground taken out, then put back)");
+  }
   const deckScratch: Prism[] = [];
-  for (const sweep of SWEEPS) {
+  for (const sweep of NORTH_ONLY ? [] : SWEEPS) {
     const [e0, n0, e1, n1] = sweep.box;
     const cx = (e0 + e1) / 2;
     const cz = zOf((n0 + n1) / 2);
@@ -1003,8 +1105,8 @@ async function runWalks(): Promise<void> {
     }
   }
 
-  say('\n1b. a capsule, stepped by the shipped controller over the shipped prisms');
-  for (const route of ROUTES) {
+  if (!NORTH_ONLY) say('\n1b. a capsule, stepped by the shipped controller over the shipped prisms');
+  for (const route of NORTH_ONLY ? [] : ROUTES) {
     const r = walk(route);
     say(`\n   ${route.name}: ${route.why}`);
     say(
@@ -1023,33 +1125,49 @@ async function runWalks(): Promise<void> {
   }
 
   // --- 2. The drive.
-  say('\n2. a car, driven through the real Simulation');
   const out: TickOutput = { tick: 0, events: [], snapshot: null };
   let plate = 0x5a11e5;
-  for (const route of ROUTES) {
-    // **A fresh `Simulation` per route, and it is not tidiness.** Everything
-    // ambient in this game is a pure function of the tick -- `traffic.poseCar`,
-    // the pedestrian bands, the timetable -- so a drive that starts on tick 0
-    // meets the same city every time, and one that starts on whatever tick the
-    // previous drive happened to end on meets a different one. The first version
-    // of this shared a simulation between the two routes and the southern drive
-    // passed or failed depending on how far the northern one had got, which is a
-    // gate that reports the weather.
+  /**
+   * How steeply a car may come down without having left a surface.
+   *
+   * A generous road grade -- `decks.TOUCHDOWN_RAMP_GRADE` is 10% -- plus the
+   * slack a staircase of flat-topped prisms needs, measured over `FALL_WINDOW_M`
+   * so that one 0.35 m riser taken in a single tick is not a fall and a ten-metre
+   * drop off the end of a deck is.
+   */
+  const FALL_GRADE = 0.12;
+  const FALL_WINDOW_M = 5;
+  /** Descent no grade explains, summed, past which a drive has fallen. */
+  const FALL_LIMIT_M = 1.5;
+  interface DriveOutcome {
+    skipped: boolean;
+    arrived: boolean;
+    reached: number;
+    legs: number;
+    x: number;
+    y: number;
+    z: number;
+    top: number;
+    health: number;
+    fell: number;
+    culprit: string;
+  }
+  /**
+   * One car along `drivePoints`, through a fresh `Simulation`.
+   *
+   * **A fresh `Simulation` per route, and it is not tidiness.** Everything
+   * ambient in this game is a pure function of the tick -- `traffic.poseCar`,
+   * the pedestrian bands, the timetable -- so a drive that starts on tick 0
+   * meets the same city every time, and one that starts on whatever tick the
+   * previous drive happened to end on meets a different one. The first version
+   * of this shared a simulation between the two routes and the southern drive
+   * passed or failed depending on how far the northern one had got, which is a
+   * gate that reports the weather.
+   */
+  const drive = (drivePoints: Array<[number, number]>): DriveOutcome => {
     const sim = new Simulation(world);
     const driver: Participant = sim.join(0, null, 'driver');
-    // **And a coarser route, because a car is not a pedestrian.** The walk's
-    // waypoints are one per deck segment, three metres apart, which at 28 m/s is
-    // a steering input every ninth of a second: the first version of this drove
-    // figure-eights up the ramp and reported the oscillation as a wall. Fifteen
-    // metres is about a third of a second at speed and is the same line the deck
-    // runs along -- the points are a subset of the walk's, never a new path.
-    const drivePoints: Array<[number, number]> = [route.points[0]];
-    for (const pt of route.points.slice(1, -1)) {
-      const last = drivePoints[drivePoints.length - 1];
-      if (Math.hypot(pt[0] - last[0], pt[1] - last[1]) >= 10) drivePoints.push(pt);
-    }
-    drivePoints.push(route.points[route.points.length - 1]);
-    const [e0, n0] = route.points[0];
+    const [e0, n0] = drivePoints[0];
     const z0 = zOf(n0);
     const y0 = g.groundHeight(e0, z0, Infinity);
     const [e1, n1] = drivePoints[1];
@@ -1066,8 +1184,10 @@ async function runWalks(): Promise<void> {
       driver.combat.id,
     );
     if (car === undefined || car === null) {
-      say(`   ${route.name}: no car could be taken here; skipped`);
-      continue;
+      return {
+        skipped: true, arrived: false, reached: 0, legs: drivePoints.length - 1,
+        x: e0, y: y0, z: z0, top: 0, health: 0, fell: 0, culprit: '',
+      };
     }
     driver.combat.drivingCar = car.id;
     driver.input.forward = 1;
@@ -1080,6 +1200,13 @@ async function runWalks(): Promise<void> {
     // Progress toward the waypoint, not distance travelled. See `walk`.
     let closest = Infinity;
     let top = 0;
+    // The fall meter: a window opens at a point, closes once the car has run
+    // `FALL_WINDOW_M` from it, and whatever descent the grade does not explain
+    // is added up. See `FALL_GRADE`.
+    let fell = 0;
+    let winX = car.x;
+    let winY = car.y;
+    let winZ = car.z;
     const LIMIT = TICK_HZ * 120;
     while (target < drivePoints.length && ticks < LIMIT) {
       const [te, tn] = drivePoints[target];
@@ -1087,6 +1214,14 @@ async function runWalks(): Promise<void> {
       sim.step(out);
       ticks++;
       if (driver.combat.carSpeed > top) top = driver.combat.carSpeed;
+      const run = Math.hypot(car.x - winX, car.z - winZ);
+      if (run >= FALL_WINDOW_M || winY - car.y > 2) {
+        const unexplained = winY - car.y - FALL_GRADE * run;
+        if (unexplained > 0) fell += unexplained;
+        winX = car.x;
+        winY = car.y;
+        winZ = car.z;
+      }
       const d = Math.hypot(car.x - te, car.z - zOf(tn));
       // **Reached, or driven past**, which a walk does not need and a car does:
       // at 28 m/s a tick is half a metre and the arrival disc is crossed in
@@ -1112,24 +1247,104 @@ async function runWalks(): Promise<void> {
     }
     driver.input.forward = 0;
     const arrived = target >= drivePoints.length;
-    say(
-      `   ${route.name}: ${arrived ? 'ARRIVED' : 'STOPPED'} at E ${car.x.toFixed(1)} ` +
-        `N ${northOf(car.z).toFixed(1)}, waypoint ${target}/${drivePoints.length - 1}, ` +
-        `top speed ${top.toFixed(1)} m/s, health ${car.health.toFixed(1)}`,
-    );
+    let named = '';
     if (!arrived) {
       const [te, tn] = drivePoints[Math.min(target, drivePoints.length - 1)];
       const len = Math.hypot(te - car.x, zOf(tn) - car.z) || 1;
-      const named = culprit(car.x, car.z, (te - car.x) / len, (zOf(tn) - car.z) / len, car.y);
-      say(`     stopped by: ${named.text}`);
-      failures.push(
-        `${route.name}: a car stopped ${target}/${drivePoints.length - 1} of the way up the ramp. ` +
-          `${named.text.split('\n')[0]}`,
-      );
+      named = culprit(car.x, car.z, (te - car.x) / len, (zOf(tn) - car.z) / len, car.y).text;
     }
+    const outcome: DriveOutcome = {
+      skipped: false,
+      arrived,
+      reached: target,
+      legs: drivePoints.length - 1,
+      x: car.x,
+      y: car.y,
+      z: car.z,
+      top,
+      health: car.health,
+      fell,
+      culprit: named,
+    };
     driver.combat.drivingCar = 0;
     sim.cars.leave(car.id);
     sim.cars.remove(car.id);
+    return outcome;
+  };
+
+  if (!NORTH_ONLY) say('\n2. a car, driven through the real Simulation');
+  for (const route of NORTH_ONLY ? [] : ROUTES) {
+    // **A coarser route, because a car is not a pedestrian.** The walk's
+    // waypoints are one per deck segment, three metres apart, which at 28 m/s is
+    // a steering input every ninth of a second: the first version of this drove
+    // figure-eights up the ramp and reported the oscillation as a wall. Fifteen
+    // metres is about a third of a second at speed and is the same line the deck
+    // runs along -- the points are a subset of the walk's, never a new path.
+    const drivePoints: Array<[number, number]> = [route.points[0]];
+    for (const pt of route.points.slice(1, -1)) {
+      const last = drivePoints[drivePoints.length - 1];
+      if (Math.hypot(pt[0] - last[0], pt[1] - last[1]) >= 10) drivePoints.push(pt);
+    }
+    drivePoints.push(route.points[route.points.length - 1]);
+    const r = drive(drivePoints);
+    if (r.skipped) {
+      say(`   ${route.name}: no car could be taken here; skipped`);
+      continue;
+    }
+    say(
+      `   ${route.name}: ${r.arrived ? 'ARRIVED' : 'STOPPED'} at E ${r.x.toFixed(1)} ` +
+        `N ${northOf(r.z).toFixed(1)}, waypoint ${r.reached}/${r.legs}, ` +
+        `top speed ${r.top.toFixed(1)} m/s, health ${r.health.toFixed(1)}`,
+    );
+    if (!r.arrived) {
+      say(`     stopped by: ${r.culprit}`);
+      failures.push(
+        `${route.name}: a car stopped ${r.reached}/${r.legs} of the way up the ramp. ` +
+          `${r.culprit.split('\n')[0]}`,
+      );
+    }
+  }
+
+  // --- 2b. Off the bridge, northward. See the header.
+  say('\n2b. a car, driven north off the bridge through the real Simulation');
+  for (const route of DRIVES_OFF) {
+    const r = drive(route.points);
+    say(`\n   ${route.name}: ${route.why}`);
+    if (r.skipped) {
+      say('     no car could be taken here; skipped');
+      failures.push(`${route.name}: no car could be taken at the start of the drive`);
+      continue;
+    }
+    // The ground under the car, bare: `groundFor` folds in the roofs and would
+    // call a deck the street.
+    const ground = world.terrain.height(r.x, r.z);
+    const overGround = r.y - ground;
+    say(
+      `     ${r.arrived ? 'ARRIVED' : 'STOPPED'} at E ${r.x.toFixed(1)} N ${northOf(r.z).toFixed(1)} ` +
+        `y ${r.y.toFixed(2)} (${overGround.toFixed(2)} m over the ground), waypoint ${r.reached}/${r.legs}, ` +
+        `top speed ${r.top.toFixed(1)} m/s, health ${r.health.toFixed(1)}, ` +
+        `fell ${r.fell.toFixed(2)} m`,
+    );
+    if (!r.arrived && r.culprit) say(`     stopped by: ${r.culprit}`);
+    if (r.fell > FALL_LIMIT_M) {
+      failures.push(
+        `${route.name}: the car fell ${r.fell.toFixed(2)} m that no road grade explains, ending at ` +
+          `E ${r.x.toFixed(1)} N ${northOf(r.z).toFixed(1)}, ${overGround.toFixed(2)} m over the ground`,
+      );
+    }
+    if (route.expect === 'street') {
+      if (!r.arrived) {
+        failures.push(
+          `${route.name}: a car stopped ${r.reached}/${r.legs} of the way off the bridge at ` +
+            `E ${r.x.toFixed(1)} N ${northOf(r.z).toFixed(1)}. ${r.culprit.split('\n')[0]}`,
+        );
+      } else if (Math.abs(overGround) > 0.5) {
+        failures.push(
+          `${route.name}: the car arrived ${overGround.toFixed(2)} m off the ground at the last waypoint, ` +
+            'which is not on the street',
+        );
+      }
+    }
   }
 }
 
