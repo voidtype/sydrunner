@@ -592,8 +592,19 @@ These are the repeatable, cheap tests that replaced browser-driven checking;
 add to them rather than around them. If the protocol shape changed, bump `PROTOCOL_VERSION` **once**
 and fix the assertion in `server/integration-check.ts` in the same commit.
 
+**2026-09-19, `zz-headroom.conf`, and the lesson in it.** The owner reported the
+live game lagging. The simulation was innocent: its own profiler read 1.45 ms of
+a 16.7 ms tick. The process was pinned at 638 MB against a `MemoryHigh=640M`
+written when this was a 1 GB box — 15,159 high events, the cgroup stalling it 22%
+of the time, 1 GB of swap in use and the GC thread holding 40% of the one core.
+The box has had 3.9 GB for a while and nothing had moved the limit. So: read
+`/sys/fs/cgroup/system.slice/sydney.service/memory.{current,events,pressure}`
+before believing any story about a slow tick — `memory.events`' `high` counter and
+`memory.pressure`'s `some avg10` name this instantly, and neither shows up in
+`/health`, in the stats line, or in anything the repo prints.
+
 The box side that code depends on and that a rsync does not carry:
-`/etc/systemd/system/sydney.service.d/{memory,state,boot-memory,residency}.conf`,
+`/etc/systemd/system/sydney.service.d/{memory,state,boot-memory,residency,zz-headroom}.conf`,
 `/etc/sysctl.d/99-sydney-swap.conf`
 (`SYDNEY_LANES_CAP_MB=60`, `SYDNEY_STATE_DIR=/var/lib/sydney`), the Caddy
 `handle /auth/*` block, and `/var/lib/sydney/{wallets,accounts}.json`, which
